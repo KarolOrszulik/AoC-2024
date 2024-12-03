@@ -5,6 +5,7 @@
 #include <string>
 #include <regex>
 
+
 std::string loadFileToString(std::string const& path)
 {
     std::ifstream file(path);
@@ -23,10 +24,10 @@ std::string loadFileToString(std::string const& path)
 
 std::vector<std::string> findValidMuls(std::string const& string)
 {
-    std::regex validMul(R"(mul\(\d{1,3},\d{1,3}\))");
+    std::regex validMulRegex(R"(mul\(\d{1,3},\d{1,3}\))");
     std::vector<std::string> result;
 
-    for (std::sregex_iterator it(string.begin(), string.end(), validMul);
+    for (std::sregex_iterator it(string.begin(), string.end(), validMulRegex);
          it != std::sregex_iterator();
          ++it)
     {
@@ -52,33 +53,25 @@ int executeMul(std::string const& mulCommand)
     return result;
 }
 
-std::string trimDisabledCode(std::string const& code)
+std::string removeNewlinesFromString(std::string const& string)
 {
-    std::regex disabledCode(R"(don\'t\(\).*?do\(\))");
+    std::string result = string;
+    result.erase(std::remove(result.begin(), result.end(), '\n'), result.cend());
 
-    struct DisabledRegion
-    {
-        int position, length;
-    };
-
-    std::vector<DisabledRegion> regions;
-
-    for (std::sregex_iterator it(code.begin(), code.end(), disabledCode);
-         it != std::sregex_iterator();
-         ++it)
-    {
-        regions.emplace_back(it->position(), it->length());
-    }
-
-    std::string trimmedCode = code;
-    for (int i = regions.size() - 1; i >= 0; i--)
-    {
-        trimmedCode.erase(regions[i].position, regions[i].length);
-    }
-    
+    return result;
 }
 
-int part1(std::vector<std::string> const& mulCommands)
+std::string trimDisabledCode(std::string const& code)
+{
+    std::string trimmedCode = removeNewlinesFromString(code);
+
+    std::regex disabledCodeRegex(R"(don\'t\(\).*?(do\(\)|$))");
+    trimmedCode = std::regex_replace(trimmedCode, disabledCodeRegex, "");
+
+    return trimmedCode;
+}
+
+int sumOfMulCommands(std::vector<std::string> const& mulCommands)
 {
     int sum = 0;
     for (auto const& mul : mulCommands)
@@ -90,8 +83,12 @@ int part1(std::vector<std::string> const& mulCommands)
 
 int main()
 {
-    std::string input = loadFileToString("../input.txt");
-    std::vector<std::string> allMuls = findValidMuls(input);
+    std::string inputCode = loadFileToString("../input.txt");
+    std::vector<std::string> allMuls = findValidMuls(inputCode);
 
-    std::cout << part1(allMuls) << std::endl;
+    std::string trimmedCode = trimDisabledCode(inputCode);
+    std::vector<std::string> trimmedMuls = findValidMuls(trimmedCode);
+
+    std::cout << sumOfMulCommands(allMuls) << std::endl;
+    std::cout << sumOfMulCommands(trimmedMuls) << std::endl;
 }
