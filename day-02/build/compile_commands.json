@@ -1,8 +1,0 @@
-[
-{
-  "directory": "/home/dolores/AoC-2024/day-2/build",
-  "command": "/usr/bin/c++   -g -o CMakeFiles/day2.dir/main.cpp.o -c /home/dolores/AoC-2024/day-2/main.cpp",
-  "file": "/home/dolores/AoC-2024/day-2/main.cpp",
-  "output": "CMakeFiles/day2.dir/main.cpp.o"
-}
-]

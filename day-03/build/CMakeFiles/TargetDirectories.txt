@@ -1,3 +1,0 @@
-/home/karol/Documents/Coding/AoC-2024/day-03/build/CMakeFiles/day3.dir
-/home/karol/Documents/Coding/AoC-2024/day-03/build/CMakeFiles/edit_cache.dir
-/home/karol/Documents/Coding/AoC-2024/day-03/build/CMakeFiles/rebuild_cache.dir

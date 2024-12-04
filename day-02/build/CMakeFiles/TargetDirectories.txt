@@ -1,3 +1,0 @@
-/home/dolores/AoC-2024/day-2/build/CMakeFiles/day2.dir
-/home/dolores/AoC-2024/day-2/build/CMakeFiles/edit_cache.dir
-/home/dolores/AoC-2024/day-2/build/CMakeFiles/rebuild_cache.dir
