@@ -5,6 +5,15 @@
 #include <string>
 #include <regex>
 
+struct MulOperation
+{
+    int a, b;
+
+    MulOperation(int a, int b)
+        : a(a), b(b) {}
+
+    int value() const { return a * b; }
+};
 
 std::string loadFileToString(std::string const& path)
 {
@@ -22,32 +31,21 @@ std::string loadFileToString(std::string const& path)
     return ss.str();
 }
 
-std::vector<std::string> findValidMuls(std::string const& string)
+std::vector<MulOperation> findValidMuls(std::string const& string)
 {
-    std::regex validMulRegex(R"(mul\(\d{1,3},\d{1,3}\))");
-    std::vector<std::string> result;
+    std::regex validMulRegex(R"(mul\((\d{1,3}),(\d{1,3})\))");
+    std::vector<MulOperation> result;
 
     for (std::sregex_iterator it(string.begin(), string.end(), validMulRegex);
          it != std::sregex_iterator();
          ++it)
     {
         std::smatch match = *it;
-        result.emplace_back(std::move(match.str()));
-    }
 
-    return result;
-}
+        int a = std::stoi(match[1].str());
+        int b = std::stoi(match[2].str());
 
-int executeMul(std::string const& mulCommand)
-{
-    std::regex number(R"(\d+)");
-
-    int result = 1;
-    for (std::sregex_iterator it(mulCommand.begin(), mulCommand.end(), number);
-         it != std::sregex_iterator();
-         ++it)
-    {
-        result *= std::stoi(it->str());
+        result.emplace_back(a, b);
     }
 
     return result;
@@ -71,12 +69,12 @@ std::string trimDisabledCode(std::string const& code)
     return trimmedCode;
 }
 
-int sumOfMulCommands(std::vector<std::string> const& mulCommands)
+int sumOfMulCommands(std::vector<MulOperation> const& mulCommands)
 {
     int sum = 0;
     for (auto const& mul : mulCommands)
     {
-        sum += executeMul(mul);
+        sum += mul.value();
     }
     return sum;
 }
@@ -84,10 +82,10 @@ int sumOfMulCommands(std::vector<std::string> const& mulCommands)
 int main()
 {
     std::string inputCode = loadFileToString("../input.txt");
-    std::vector<std::string> allMuls = findValidMuls(inputCode);
+    std::vector<MulOperation> allMuls = findValidMuls(inputCode);
 
     std::string trimmedCode = trimDisabledCode(inputCode);
-    std::vector<std::string> trimmedMuls = findValidMuls(trimmedCode);
+    std::vector<MulOperation> trimmedMuls = findValidMuls(trimmedCode);
 
     std::cout << sumOfMulCommands(allMuls) << std::endl;
     std::cout << sumOfMulCommands(trimmedMuls) << std::endl;
