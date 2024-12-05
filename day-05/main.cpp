@@ -6,6 +6,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <regex>
+#include <numeric>
 
 class Solution
 {
@@ -34,31 +35,28 @@ public:
         }
     }
 
-    int part1()
+        int part1()
     {
-        int sum = 0;
-        for (auto const& update : updates)
-        {
-            if (isUpdateCorrect(update))
-            {
-                sum += middlePage(update);
-            }
-        }
-        return sum;
+        return std::accumulate(
+            updates.begin(),
+            updates.end(),
+            int {},
+            [this] (int sum, Update const& update) {
+                return sum + updateValueForPartOne(update);
+            });
     }
 
     int part2()
     {
-        int sum = 0;
-        for (auto const& update : updates)
-        {
-            if (isUpdateCorrect(update))
-                continue;
-            
-            sum += middlePage(fixUpdate(update));
-        }
-        return sum;
+        return std::accumulate(
+            updates.begin(),
+            updates.end(),
+            int {},
+            [this] (int sum, Update const& update) {
+                return sum + updateValueForPartTwo(update);
+            });
     }
+
 
 private:
     using OrderingRules = std::unordered_map<int, std::unordered_set<int>>;
@@ -80,30 +78,46 @@ private:
         Update result;
 
         std::regex numberRegex("\\d+");
-        for (std::sregex_iterator it(numbers.begin(), numbers.end(), numberRegex); it != std::sregex_iterator(); ++it)
+        for (std::sregex_iterator it(numbers.begin(), numbers.end(), numberRegex);
+            it != std::sregex_iterator();
+            ++it)
         {
-            result.push_back(std::stoi(it->str()));
+            const int number = std::stoi(it->str());
+            result.push_back(number);
         }
 
         updates.push_back(result);
     }
 
-    bool isUpdateCorrect(Update const& update)
+    int updateValueForPartOne(Update const& update)
     {
-        for (int i = 0; i < update.size() - 1; i++)
-        {
-            const int current = update[i];
-            for (int j = i + 1; j < update.size(); j++)
-            {
-                const int second = update[j];
-                if (rules[current].count(second) == 0)
-                    return false;
-            }
-        }
-        return true;
+        if (isUpdateCorrect(update))
+            return middlePage(update);
+        
+        return 0;
     }
 
-    void fixSingleError(Update& update)
+    int updateValueForPartTwo(Update const& update)
+    {
+        if (isUpdateCorrect(update))
+            return 0;
+        
+        return middlePage(fixUpdate(update));
+    }
+
+    int middlePage(Update const& update)
+    {
+        return update[update.size() / 2];
+    }
+
+    
+
+    bool isUpdateCorrect(Update const& update)
+    {
+        return std::pair{-1, -1} == getFirstError(update);
+    }
+
+    std::pair<int, int> getFirstError(Update const& update)
     {
         for (int i = 0; i < update.size() - 1; i++)
         {
@@ -112,9 +126,10 @@ private:
             {
                 const int second = update[j];
                 if (rules[current].count(second) == 0)
-                    std::swap(update[i], update[j]);
+                    return {i, j};
             }
         }
+        return {-1, -1};
     }
 
     Update fixUpdate(Update const& update)
@@ -122,14 +137,10 @@ private:
         Update fixed = update;
         while (!isUpdateCorrect(fixed))
         {
-            fixSingleError(fixed);
+            const std::pair errorIdx = getFirstError(fixed);
+            std::swap(fixed[errorIdx.first], fixed[errorIdx.second]);
         }
         return fixed;
-    }
-
-    int middlePage(Update const& update)
-    {
-        return update[update.size() / 2];
     }
 
     OrderingRules rules;
@@ -139,7 +150,7 @@ private:
 int main()
 {
     Solution solution;
-    
+
     solution.loadInput("../input.txt");
     std::cout << solution.part1() << std::endl;
     std::cout << solution.part2() << std::endl;
