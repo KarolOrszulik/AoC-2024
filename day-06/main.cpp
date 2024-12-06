@@ -8,6 +8,11 @@ struct Position
 {
     int x = 0;
     int y = 0;
+
+    bool operator==(Position const& other)
+    {
+        return x == other.x && y == other.y;
+    }
 };
 
 enum class Orientation
@@ -103,9 +108,12 @@ public:
                         break;
                 }
             }
+
+            board.push_back(row);
         }
 
         initVisited();
+        visit(initialGuardPosition);
     }
 
     Position getInitialGuardPosition()
@@ -119,6 +127,11 @@ public:
             return Tile::ILLEGAL;
         
         return board[pos.y][pos.x];
+    }
+
+    void setTileAt(Position pos, Tile newTile)
+    {
+        board[pos.y][pos.x] = newTile;
     }
 
     void visit(Position pos)
@@ -180,7 +193,26 @@ public:
 
     int part2()
     {
-        return 0;
+        guard = Guard(board.getInitialGuardPosition());
+        int sum = 0;
+
+        for (int y = 0; y < board.height(); y++)
+        {
+            for (int x = 0; x < board.width(); x++)
+            {
+                if (Position{x, y} == board.getInitialGuardPosition())
+                    continue;
+
+                if (board.at({x, y}) == Board::Tile::OBSTRUCTION)
+                    continue;
+
+                board.setTileAt({x, y}, Board::Tile::OBSTRUCTION);
+                sum += doesGuardGetStuck();
+                board.setTileAt({x, y}, Board::Tile::EMPTY);
+            }
+        }
+
+        return sum;
     }
 
 private:
@@ -204,6 +236,21 @@ private:
             guard.stepForward();
             board.visit(guard.getPosition());
         }
+    }
+
+    bool doesGuardGetStuck()
+    {
+        int area = board.width() * board.height();
+
+        while (area--)
+        {
+            if (isGuardFinished())
+                return false;
+            
+            moveGuard();
+        }
+
+        return true;
     }
 
     Guard guard;
