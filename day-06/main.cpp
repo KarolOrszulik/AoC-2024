@@ -193,7 +193,6 @@ public:
 
     int part2()
     {
-        guard = Guard(board.getInitialGuardPosition());
         int sum = 0;
 
         for (int y = 0; y < board.height(); y++)
@@ -206,6 +205,7 @@ public:
                 if (board.at({x, y}) == Board::Tile::OBSTRUCTION)
                     continue;
 
+                guard = Guard(board.getInitialGuardPosition()); 
                 board.setTileAt({x, y}, Board::Tile::OBSTRUCTION);
                 sum += doesGuardGetStuck();
                 board.setTileAt({x, y}, Board::Tile::EMPTY);
