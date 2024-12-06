@@ -2,24 +2,35 @@
 #include <fstream>
 #include <string>
 #include <vector>
+#include <algorithm>
 
-struct Guard
+struct Position
 {
-    struct Position
-    {
-        int x = 0;
-        int y = 0;
-    } position;
+    int x = 0;
+    int y = 0;
+};
 
-    enum class Orientation
-    {
-        NORTH,
-        EAST,
-        SOUTH,
-        WEST
-    } orientation = Orientation::NORTH;
+enum class Orientation
+{
+    NORTH,
+    EAST,
+    SOUTH,
+    WEST
+};
 
-    Position nextPosition()
+class Guard
+{
+public:
+    Guard(Position pos = {0, 0})
+        : position(pos)
+    {}
+
+    Position getPosition()
+    {
+        return position;
+    }
+
+    Position getNextPosition()
     {
         switch (orientation)
         {
@@ -32,6 +43,7 @@ struct Guard
             case Orientation::WEST:
                 return Position{position.x - 1, position.y};
         }
+        throw; // unreachable
     }
 
     void rotateClockwise()
@@ -40,20 +52,28 @@ struct Guard
         ++orient %= 4;
         orientation = static_cast<Orientation>(orient);
     }
+
+    void stepForward()
+    {
+        position = getNextPosition();
+    }
+
+private:
+    Position position = { 0, 0 };
+    Orientation orientation = Orientation::NORTH;
 };
 
-class Solution
+class Board
 {
 public:
     enum class Tile
     {
-        OUTSIDE,
+        ILLEGAL,
         EMPTY,
-        OBSTACKLE,
-        GUARD
+        OBSTRUCTION,
     };
 
-    void loadInputFromFile(std::string const& path)
+    void loadFromFile(std::string const& path)
     {
         std::ifstream file(path);
 
@@ -64,38 +84,137 @@ public:
         }
 
         std::string line;
-        while (std::getline(file, line))
-            board.push_back(std::move(line));
+        for (int y = 0; std::getline(file, line); y++)
+        {
+            std::vector<Tile> row;
+
+            for (int x = 0; x < line.length(); x++)
+            {
+                switch (line[x])
+                {
+                    case '^':
+                        initialGuardPosition = {x, y};
+                        // fall through
+                    case '.':
+                        row.push_back(Tile::EMPTY);
+                        break;
+                    case '#':
+                        row.push_back(Tile::OBSTRUCTION);
+                        break;
+                }
+            }
+        }
+
+        initVisited();
+    }
+
+    Position getInitialGuardPosition()
+    {
+        return initialGuardPosition;
+    }
+
+    Tile at(Position pos)
+    {
+        if (pos.x < 0 || pos.x >= width() || pos.y < 0 || pos.y >= height())
+            return Tile::ILLEGAL;
         
-        placeGuard();
+        return board[pos.y][pos.x];
+    }
+
+    void visit(Position pos)
+    {
+        if (at(pos) == Tile::ILLEGAL)
+            return;
+        
+        visited[pos.y][pos.x] = true;
+    }
+
+    int getNumberOfVisitedTiles()
+    {
+        int sum = 0;
+        for (int y = 0; y < height(); y++)
+        {
+            sum += std::count(visited[y].begin(), visited[y].end(), true);
+        }
+        return sum;
+    }
+
+    int width()
+    {
+        return board[0].size();
+    }
+
+    int height()
+    {
+        return board.size();
+    }
+
+private:
+    void initVisited()
+    {
+        visited = std::vector<std::vector<bool>>(height(), std::vector<bool>(width(), false));
+    }
+
+    std::vector<std::vector<Tile>> board;
+    std::vector<std::vector<bool>> visited;
+    Position initialGuardPosition;
+};
+
+class Solution
+{
+public:
+    void loadInputFromFile(std::string const& path)
+    {
+        board.loadFromFile(path);
+        guard = board.getInitialGuardPosition();
+    }
+
+    int part1()
+    {
+        while(!isGuardFinished())
+        {
+            moveGuard();
+        }
+        return board.getNumberOfVisitedTiles();
+    }
+
+    int part2()
+    {
+        return 0;
     }
 
 private:
     static constexpr char GUARD_CHAR = '^';
 
-    void placeGuard()
+    bool isGuardFinished()
     {
-        for (int y = 0; y < board.size(); y++)
+        return board.at(guard.getNextPosition()) == Board::Tile::ILLEGAL;
+    }
+
+    void moveGuard()
+    {
+        Board::Tile nextTile = board.at(guard.getNextPosition());
+        
+        if (nextTile == Board::Tile::OBSTRUCTION)
         {
-            for (int x = 0; x < board[y].size(); x++)
-            {
-                if (board[y][x] == GUARD_CHAR)
-                {
-                    guard.position = {x, y};
-                    return;
-                }
-            }
+            guard.rotateClockwise();
+        }
+        else
+        {
+            guard.stepForward();
+            board.visit(guard.getPosition());
         }
     }
 
-
-
     Guard guard;
-    std::vector<std::string> board;
+    Board board;
 };
 
 int main()
 {
     Solution solution;
-    solution.loadInputFromFile("../input_small.txt");
+    solution.loadInputFromFile("../input.txt");
+
+    std::cout << solution.part1() << std::endl;
+    std::cout << solution.part2() << std::endl;
 }
