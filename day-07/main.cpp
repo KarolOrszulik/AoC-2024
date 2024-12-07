@@ -19,7 +19,8 @@ struct Equation
         using bitmask_t = size_t;
         assert(numOperators <= sizeof(bitmask_t) * 8);
 
-        for (bitmask_t bitmask = 0; bitmask < 1<<numOperators; bitmask++)
+        const int maxBitmasksNeeded = 1 << numOperators;
+        for (bitmask_t bitmask = 0; bitmask < maxBitmasksNeeded; bitmask++)
         {
             size_t total = operands[0];
 
@@ -40,34 +41,66 @@ struct Equation
         return false;
     };
 
+
     bool canBeValidForThreeOperators() const
     {
+        if (canBeValidForTwoOperators())
+            return true;
+
+        enum class Operator
+        {
+            ADD = 0b00,
+            MULTIPLY = 0b01,
+            CONCATENATE = 0b10,
+            INVALID = 0b11
+        };
+
         const int numOperators = operands.size() - 1;
 
         using bitmask_t = size_t;
         constexpr int BITS_PER_OPERATOR = 2;
         assert(numOperators <= sizeof(bitmask_t) * 8 / BITS_PER_OPERATOR);
 
+        auto ithOperator = [] (bitmask_t bitmask, int i) -> Operator {
+            return static_cast<Operator>((bitmask >> (i * BITS_PER_OPERATOR)) & 0b11);
+        };
+
+        auto validateBitmast = [numOperators, ithOperator] (bitmask_t bitmask) -> bool {
+            bool hasConcat = false;
+            for (int i = 0; i < numOperators; i++)
+            {
+                Operator op = ithOperator(bitmask, i);
+
+                if (op == Operator::CONCATENATE)
+                    hasConcat = true;
+                else if (op == Operator::INVALID)
+                    return false;
+            }
+            return hasConcat;
+        };
+
         const int numBitmasks = 1 << (numOperators * BITS_PER_OPERATOR);
         for (bitmask_t bitmask = 0; bitmask < numBitmasks; bitmask++)
         {
+            if (!validateBitmast(bitmask))
+                continue;
+
             size_t total = operands[0];
 
-            for (int i = 0; i < operands.size() - 1; i++)
+            for (int i = 0; i < numOperators; i++)
             {
-                const int operatorBitcode = (bitmask >> (i * BITS_PER_OPERATOR)) & 0b11;
+                const Operator op = ithOperator(bitmask, i);
                 const int otherOperand = operands[i+1];
                 
-                switch (operatorBitcode)
+                switch (op)
                 {
-                case 0b00:
+                case Operator::ADD:
                     total += otherOperand;
                     break;
-                case 0b01:
+                case Operator::MULTIPLY:
                     total *= otherOperand;
                     break;
-                case 0b10:
-                case 0b11:
+                case Operator::CONCATENATE:
                     total = std::stoul(std::to_string(total) + std::to_string(otherOperand));
                     break;
                 }
@@ -114,14 +147,6 @@ public:
     
     size_t part2() const
     {
-        // size_t sum = 0;
-        // for (Equation const& eq : equations)
-        // {
-        //     if (eq.canBeValidForThreeOperators())
-        //         sum += eq.result;
-        // }
-        // return sum;
-
         std::vector<std::future<size_t>> futures;
 
         for (Equation const& eq : equations)
