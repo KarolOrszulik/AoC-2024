@@ -1,7 +1,9 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
+#include <string>
 #include <algorithm>
+#include <list>
 
 class DiskImage
 {
@@ -50,7 +52,7 @@ public:
 
         int emptyIdx = firstEmptyIt - disk.begin();
 
-        for (int i = disk.size()-1; i >= 0; i--)
+        for (int i = disk.size() - 1; i >= 0; i--)
         {
             if (i <= emptyIdx)
                 return;
@@ -70,7 +72,7 @@ public:
             size_t num = disk[i];
             if (num == EMPTY_SPACE)
                 break;
-            
+
             sum += i * num;
         }
         return sum;
@@ -91,97 +93,121 @@ public:
     {
         std::ifstream file(path);
 
-        if (!file) 
+        if (!file)
         {
             std::cerr << "Could not open input file" << std::endl;
             return;
         }
 
-        char c;
-
         size_t currIdx = 0;
         bool isFile = true;
+
+        char c;
         while (file >> c)
         {
             size_t size = c - '0';
+            size_t id = isFile ? currIdx : EMPTY_ID;
+            disk.push_back({ size, id });
 
-            if (size > 0)
-            {
-                disk.push_back(Descriptor { currIdx, size, isFile });
-            }
+            if (isFile)
+                currIdx++;
 
-            currIdx += size;
             isFile = !isFile;
         }
     }
 
     void defragment() override
     {
-        for (int i = disk.size() - 1; i >= 0; i)
+        for (auto it = disk.rbegin(); it != disk.rend(); ++it)
         {
-            int emptyIdx = idxOfLeftmostFittingSpace(disk[i].size);
-            if (emptyIdx == -1)
+            if (it->id == EMPTY_ID)
                 continue;
-            
-            Descriptor fileCopy = disk[i];
 
-            disk[emptyIdx].start += fileCopy.size;
-            disk[emptyIdx].size  -= fileCopy.size;
+            auto emptySpotIt = firstEmptySpaceOfMinSize(it->size);
+            if (emptySpotIt == disk.end())
+                continue;
 
-            disk.erase(disk.begin() + i);
-            disk.emplace(disk.begin() + emptyIdx, fileCopy);
+            const size_t emptySpotIdx = std::distance(disk.begin(), emptySpotIt);
+            const size_t itIdx = disk.size() - 1 - std::distance(disk.rbegin(), it);
+            if (emptySpotIdx >= itIdx)
+                continue;
 
-            removeZeroSizeEmptySpaces();
-            mergeEmptySpaces();
+            // decrease empty space size and insert copied file descriptor at its beginning
+            emptySpotIt->size -= it->size;
+            disk.insert(emptySpotIt, *it);
+
+            // set old file's id to empty space to be removed in the next step
+            it->id = EMPTY_ID;
+
+            // merge all subsequent empty spaces into 1 big one and several 0-size ones
+            mergeEmptySpace();
         }
+
+        // delete 0-sized files (not actually necessary?)
+        eraseZeroLengthDescriptors();
     }
 
     size_t getChecksum() const override
     {
-        return 0;
+        size_t sum = 0;
+        size_t idx = 0;
+        for (Descriptor const& file : disk)
+        {
+            if (file.id == EMPTY_ID)
+            {
+                //idx++;
+                continue;
+            }
+            
+            for (int i = 0; i < file.size; i++)
+                sum += file.id * idx++;
+        }
+        return sum;
     }
 
 private:
+    using id_t = size_t;
+    static constexpr id_t EMPTY_ID = -1;
+
     struct Descriptor
     {
-        size_t start, size;
-        bool isFile;
+        size_t size;
+        id_t id;
     };
 
-    int idxOfLeftmostFittingSpace(size_t minSize)
+    std::list<Descriptor>::iterator firstEmptySpaceOfMinSize(size_t minSize)
     {
-        for (int i = 0; i < disk.size(); i++)
+        for (auto it = disk.begin(); it != disk.end(); ++it)
         {
-            if (!disk[i].isFile && disk[i].size >= minSize)
-                return i;
+            if (it->id == EMPTY_ID && it->size >= minSize)
+                return it;
         }
-        return -1;
+        return disk.end();
     }
 
-    void removeZeroSizeEmptySpaces()
+    void mergeEmptySpace()
     {
-        for (int i = disk.size() - 1; i >= 0; i--)
+        for (auto it = disk.rbegin(); it != disk.rend(); ++it)
         {
-            if (disk[i].isFile || disk[i].size > 0)
+            if (it->id != EMPTY_ID)
                 continue;
             
-            disk.erase(disk.begin() + i);
+            auto nextIt = std::next(it);
+
+            if (nextIt != disk.rend() && nextIt->id == EMPTY_ID)
+            {
+                nextIt->size += it->size;
+                it->size = 0;
+            }
         }
     }
 
-    void mergeEmptySpaces()
+    void eraseZeroLengthDescriptors()
     {
-        for (int i = disk.size() - 2; i >= 0; i--)
-        {
-            if (disk[i].isFile || disk[i+1].isFile)
-                continue;
-            
-            disk[i].size += disk[i+1].size;
-            disk.erase(disk.begin() + i + 1);
-        }
+        disk.erase(std::remove_if(disk.begin(), disk.end(), [](auto const& d) { return d.size == 0; }), disk.end());
     }
 
-    std::vector<Descriptor> disk;
+    std::list<Descriptor> disk;
 };
 
 class Solution
@@ -214,6 +240,8 @@ private:
 
 int main()
 {
+    // system("pwd");
+
     Solution solution;
     solution.setInputFilePath("../input_small.txt");
 
