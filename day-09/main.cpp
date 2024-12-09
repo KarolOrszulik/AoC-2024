@@ -123,13 +123,10 @@ public:
             if (it->id == EMPTY_ID)
                 continue;
 
-            auto emptySpotIt = firstEmptySpaceOfMinSize(it->size);
-            if (emptySpotIt == disk.end())
-                continue;
-
-            const size_t emptySpotIdx = std::distance(disk.begin(), emptySpotIt);
+            const auto [emptySpotIt, emptySpotIdx] = firstEmptySpaceOfMinSize(it->size);
             const size_t itIdx = disk.size() - 1 - std::distance(disk.rbegin(), it);
-            if (emptySpotIdx >= itIdx)
+
+            if (emptySpotIt == disk.end() || emptySpotIdx >= itIdx)
                 continue;
 
             // decrease empty space size and insert copied file descriptor at its beginning
@@ -143,8 +140,8 @@ public:
             mergeEmptySpace();
         }
 
-        // delete 0-sized files (not actually necessary?)
-        eraseZeroLengthDescriptors();
+        // delete 0-sized files (not actually necessary?) - confirmed, works without, and slightly faster, too
+        // eraseZeroLengthDescriptors();
     }
 
     size_t getChecksum() const override
@@ -152,15 +149,12 @@ public:
         size_t sum = 0;
         size_t idx = 0;
         for (Descriptor const& file : disk)
-        {
-            if (file.id == EMPTY_ID)
-            {
-                //idx++;
-                continue;
-            }
-            
+        {           
             for (int i = 0; i < file.size; i++)
-                sum += file.id * idx++;
+            {
+                sum += file.id == EMPTY_ID ? 0 : file.id * idx;
+                idx++;
+            }
         }
         return sum;
     }
@@ -175,14 +169,15 @@ private:
         id_t id;
     };
 
-    std::list<Descriptor>::iterator firstEmptySpaceOfMinSize(size_t minSize)
+    std::pair<std::list<Descriptor>::iterator, size_t> firstEmptySpaceOfMinSize(size_t minSize)
     {
-        for (auto it = disk.begin(); it != disk.end(); ++it)
+        size_t idx = 0;
+        for (auto it = disk.begin(); it != disk.end(); ++it, ++idx)
         {
             if (it->id == EMPTY_ID && it->size >= minSize)
-                return it;
+                return { it, idx };
         }
-        return disk.end();
+        return { disk.end(), -1 };
     }
 
     void mergeEmptySpace()
@@ -243,8 +238,8 @@ int main()
     // system("pwd");
 
     Solution solution;
-    solution.setInputFilePath("../input_small.txt");
+    solution.setInputFilePath("../input.txt");
 
-    // std::cout << solution.part1() << std::endl;
+    std::cout << solution.part1() << std::endl;
     std::cout << solution.part2() << std::endl;
 }
