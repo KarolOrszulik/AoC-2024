@@ -5,17 +5,14 @@
 #include <algorithm>
 #include <list>
 
-class DiskImage
-{
-    virtual void loadFromFile(std::string const&) = 0;
-    virtual void defragment() = 0;
-    virtual size_t getChecksum() const = 0;
-};
+using ID_t = size_t;
+static constexpr ID_t EMPTY_ID = -1;
 
-class FragmentedDiskImage : public DiskImage
+// only works for part 1
+class VectorDiskImage
 {
 public:
-    void loadFromFile(std::string const& path) override
+    void loadFromFile(std::string const& path)
     {
         std::ifstream file(path);
         disk.clear();
@@ -26,31 +23,29 @@ public:
             return;
         }
 
-        char c;
-
-        FileFragmentID currID = 0;
+        ID_t currID = 0;
         bool isFile = true;
+
+        char c;
         while (file >> c)
         {
-            int num = std::stoi(std::string(1, c));
-            FileFragmentID id = isFile ? currID : EMPTY_SPACE;
-            for (int i = 0; i < num; i++)
-            {
-                disk.push_back(id);
-            }
+            const int numFileFragments = c - '0';
+
+            for (int i = 0; i < numFileFragments; i++)
+                disk.push_back(isFile ? currID : EMPTY_ID);
+
             if (isFile)
                 currID++;
-            isFile ^= 1;
+
+            isFile = !isFile;
         }
     }
 
-    void defragment() override
+    void defragment()
     {
-        auto firstEmptyIt = std::find(disk.begin(), disk.end(), EMPTY_SPACE);
-        if (firstEmptyIt == disk.end())
+        size_t emptyIdx = findFirstEmptySpace();
+        if (emptyIdx == -1)
             return;
-
-        int emptyIdx = firstEmptyIt - disk.begin();
 
         for (int i = disk.size() - 1; i >= 0; i--)
         {
@@ -59,18 +54,18 @@ public:
 
             std::swap(disk[i], disk[emptyIdx]);
 
-            while (disk[emptyIdx] != EMPTY_SPACE)
+            while (disk[emptyIdx] != EMPTY_ID)
                 emptyIdx++;
         }
     }
 
-    size_t getChecksum() const override
+    size_t getChecksum() const
     {
         size_t sum = 0;
         for (size_t i = 0; i < disk.size(); i++)
         {
             size_t num = disk[i];
-            if (num == EMPTY_SPACE)
+            if (num == EMPTY_ID)
                 break;
 
             sum += i * num;
@@ -79,18 +74,26 @@ public:
     }
 
 private:
-    using FileFragmentID = size_t;
-    static constexpr FileFragmentID EMPTY_SPACE = -1;
+    size_t findFirstEmptySpace()
+    {
+        for (size_t i = 0; i < disk.size(); i++)
+            if (disk[i] == EMPTY_ID)
+                return i;
+        
+        return -1;
+    }
 
-    std::vector<FileFragmentID> disk;
+    std::vector<ID_t> disk;
 };
 
 
-class UnfragmentedDiskImage : public DiskImage
+// works for both parts but for part 1 is much slower than VectorDiskImage
+class ListDiskImage
 {
 public:
-    void loadFromFile(std::string const& path) override
+    void loadFromFileForPart(std::string const& path, int part)
     {
+        disk.clear();
         std::ifstream file(path);
 
         if (!file)
@@ -107,7 +110,15 @@ public:
         {
             size_t size = c - '0';
             size_t id = isFile ? currIdx : EMPTY_ID;
-            disk.push_back({ size, id });
+            
+
+            if (part == 1)
+                createFilesForPart1(size, id);
+            else if (part == 2)
+                createFileForPart2(size, id);
+            else
+                throw "Invalid part number, only 1 and 2 permitted";
+
 
             if (isFile)
                 currIdx++;
@@ -116,7 +127,7 @@ public:
         }
     }
 
-    void defragment() override
+    void defragment()
     {
         for (auto it = disk.rbegin(); it != disk.rend(); ++it)
         {
@@ -144,7 +155,7 @@ public:
         // eraseZeroLengthDescriptors();
     }
 
-    size_t getChecksum() const override
+    size_t getChecksum() const
     {
         size_t sum = 0;
         size_t idx = 0;
@@ -160,14 +171,22 @@ public:
     }
 
 private:
-    using id_t = size_t;
-    static constexpr id_t EMPTY_ID = -1;
-
     struct Descriptor
     {
         size_t size;
-        id_t id;
+        ID_t id;
     };
+
+    void createFilesForPart1(size_t size, ID_t id)
+    {
+        for (size_t i = 0; i < size; i++)
+            disk.push_back({1, id});
+    }
+
+    void createFileForPart2(size_t size, ID_t id)
+    {
+        disk.push_back({size, id});
+    }
 
     std::pair<std::list<Descriptor>::iterator, size_t> firstEmptySpaceOfMinSize(size_t minSize)
     {
@@ -205,6 +224,7 @@ private:
     std::list<Descriptor> disk;
 };
 
+
 class Solution
 {
 public:
@@ -215,16 +235,23 @@ public:
 
     size_t part1() const
     {
-        FragmentedDiskImage image;
-        image.loadFromFile(inputPath);
-        image.defragment();
-        return image.getChecksum();
+        // #define USE_LIST_IMPLEMENTATION
+
+#ifdef USE_LIST_IMPLEMENTATION
+            ListDiskImage image;
+            image.loadFromFileForPart(inputPath, 1); // works slowly
+#else
+            VectorDiskImage image;
+            image.loadFromFile(inputPath);
+#endif
+            image.defragment();
+            return image.getChecksum();
     }
 
     size_t part2() const
     {
-        UnfragmentedDiskImage image;
-        image.loadFromFile(inputPath);
+        ListDiskImage image;
+        image.loadFromFileForPart(inputPath, 2);
         image.defragment();
         return image.getChecksum();
     }
@@ -235,8 +262,6 @@ private:
 
 int main()
 {
-    // system("pwd");
-
     Solution solution;
     solution.setInputFilePath("../input.txt");
 
