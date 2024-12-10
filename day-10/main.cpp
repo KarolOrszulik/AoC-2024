@@ -2,6 +2,19 @@
 #include <fstream>
 #include <vector>
 #include <string>
+#include <unordered_set>
+
+namespace std
+{
+    template<>
+    struct hash<std::pair<int, int>>
+    {
+        size_t operator()(std::pair<int,int> const& p) const
+        {
+            return std::hash<int>{}(p.first) << 16 | std::hash<int>{}(p.second);
+        }
+    };
+}
 
 class Heightmap
 {
@@ -97,7 +110,7 @@ private:
 
         if (height == Heightmap::TRAIL_END && !hasVisitedTrailEndAt(x, y))
         {
-            visitedTrailEnds.emplace_back(x, y);
+            visitedTrailEnds.insert({x, y});
             return 1;
         }
         
@@ -111,16 +124,11 @@ private:
 
     bool hasVisitedTrailEndAt(int x, int y)
     {
-        for (auto v : visitedTrailEnds)
-        {
-            if (v == std::pair {x, y})
-                return true;
-        }
-        return false;
+        return visitedTrailEnds.count({x, y}) != 0;
     }
 
     Heightmap heightmap;
-    std::vector<std::pair<int, int>> visitedTrailEnds;
+    std::unordered_set<std::pair<int, int>> visitedTrailEnds;
 };
 
 int main()
