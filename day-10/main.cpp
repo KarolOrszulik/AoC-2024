@@ -3,6 +3,7 @@
 #include <vector>
 #include <string>
 #include <unordered_set>
+#include <array>
 
 namespace std
 {
@@ -119,10 +120,12 @@ private:
             return 1;
         }
         
+        constexpr std::array<std::pair<int,int>, 4> deltas {{{1,0}, {-1,0}, {0,1}, {0,-1}}};
         size_t trails = 0;
-        for (auto const [dx, dy]
-                : std::initializer_list<std::pair<int,int>>{{1,0}, {-1,0}, {0,1}, {0,-1}})
+
+        for (auto const [dx, dy] : deltas)
             trails += countTrailEndsReachableFrom(x+dx, y+dy, height+1);
+            
         return trails;
     }
 
