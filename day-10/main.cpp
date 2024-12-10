@@ -77,31 +77,35 @@ public:
         heightmap.loadFromFile(path);
     }
 
-    size_t part1()
+    size_t part1() const
+    {
+        uniqueTrailsEnds = true;
+        return partCommon();
+    }
+
+    size_t part2() const
+    {
+        uniqueTrailsEnds = false;
+        return partCommon();
+    }
+
+private:
+    size_t partCommon() const
     {
         size_t sum = 0;
         for (int y = 0; y < heightmap.getHeight(); y++)
         {
             for (int x = 0; x < heightmap.getWidth(); x++)
             {
-                if (heightmap.at(x, y) == Heightmap::TRAIL_START)
-                {
-                    visitedTrailEnds.clear();
-                    size_t score = countTrailsStartingAt(x, y, Heightmap::TRAIL_START);
-                    sum += score;
-                }
+                visitedTrailEnds.clear();
+                size_t score = countTrailEndsReachableFrom(x, y);
+                sum += score;
             }
         }
         return sum;
     }
 
-    size_t part2() const
-    {
-        return 0;
-    }
-
-private:
-    size_t countTrailsStartingAt(int x, int y, int height = Heightmap::TRAIL_START)
+    size_t countTrailEndsReachableFrom(int x, int y, int height = Heightmap::TRAIL_START) const
     {
         if (heightmap.at(x, y) != height)
         {
@@ -110,25 +114,26 @@ private:
 
         if (height == Heightmap::TRAIL_END && !hasVisitedTrailEndAt(x, y))
         {
-            visitedTrailEnds.insert({x, y});
+            if (uniqueTrailsEnds)
+                visitedTrailEnds.insert({x, y});
             return 1;
         }
         
         size_t trails = 0;
-        trails += countTrailsStartingAt(x+1, y, height+1);
-        trails += countTrailsStartingAt(x-1, y, height+1);
-        trails += countTrailsStartingAt(x, y+1, height+1);
-        trails += countTrailsStartingAt(x, y-1, height+1);
+        for (auto const [dx, dy]
+                : std::initializer_list<std::pair<int,int>>{{1,0}, {-1,0}, {0,1}, {0,-1}})
+            trails += countTrailEndsReachableFrom(x+dx, y+dy, height+1);
         return trails;
     }
 
-    bool hasVisitedTrailEndAt(int x, int y)
+    bool hasVisitedTrailEndAt(int x, int y) const
     {
         return visitedTrailEnds.count({x, y}) != 0;
     }
 
     Heightmap heightmap;
-    std::unordered_set<std::pair<int, int>> visitedTrailEnds;
+    mutable std::unordered_set<std::pair<int, int>> visitedTrailEnds;
+    mutable bool uniqueTrailsEnds = false;
 };
 
 int main()
