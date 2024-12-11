@@ -1,6 +1,6 @@
 #include <iostream>
 #include <fstream>
-#include <list>
+#include <unordered_map>
 #include <cmath>
 
 class Solution
@@ -22,13 +22,9 @@ public:
     }
 
 private:
-    std::string inputFilePath;
-    std::list<size_t> stones;
-    using stone_it = decltype(stones)::iterator;
-
     void loadStonesFromFile()
     {
-        stones.clear();
+        stoneNumToCount.clear();
 
         std::ifstream file(inputFilePath);
         
@@ -40,7 +36,7 @@ private:
 
         size_t number;
         while (file >> number)
-            stones.push_back(number);
+            stoneNumToCount[number]++;
     }
 
     size_t partCommon(size_t numIterations)
@@ -49,18 +45,42 @@ private:
 
         for (size_t i = 0; i < numIterations; i++)
         {
-            std::cout << "Starting iteration: " << i+1 << "...";
             updateStones();
-            std::cout << "Done with stone count of " << stones.size() << std::endl;
         }
         
-        return stones.size();
+        return getStoneCount();
     }
 
     void updateStones()
     {
-        for (auto it = stones.begin(); it != stones.end(); ++it)
-            processSingleStone(it);
+        std::unordered_map<size_t, size_t> newStones;
+
+        for (auto const [number, count] : stoneNumToCount)
+        {
+            if (number == 0)
+            {
+                newStones[1] += count;
+                continue;
+            }
+
+            size_t numLength = numDigits(number);
+
+            if (numLength % 2 == 1)
+            {
+                newStones[number * 2024] += count;
+            }
+            else
+            {
+                const size_t power = nthPowerOf10(numLength / 2);
+                const size_t leftPart = number / power;
+                const size_t rightPart = number % power;
+
+                newStones[leftPart] += count;
+                newStones[rightPart] += count;
+            }
+        }
+
+        stoneNumToCount = std::move(newStones);
     }
 
     size_t numDigits(size_t n)
@@ -83,46 +103,16 @@ private:
         return  result;
     }
 
-    void processSingleStone(stone_it it)
+    size_t getStoneCount() const
     {
-        if (*it == 0)
-        {
-            processZero(it);
-        }
-        else
-        {
-            const size_t numLength = numDigits(*it);
-
-            if (numLength % 2 == 0)
-            {
-                processEvenNumDigits(it, numLength);
-            }
-            else
-            {
-                processOddNumDigits(it);
-            }
-        }
+        size_t total = 0;
+        for (const auto [number, count] : stoneNumToCount)
+            total += count;
+        return total;
     }
 
-    void processZero(stone_it it)
-    {
-        *it = 1;
-    }
-
-    void processEvenNumDigits(stone_it it, size_t numLength)
-    {
-        const size_t power = nthPowerOf10(numLength / 2);
-        const size_t leftPart = (*it) / power;
-        const size_t rightPart = (*it) % power;
-
-        *it = rightPart;
-        stones.insert(it, leftPart);
-    }
-
-    void processOddNumDigits(stone_it it)
-    {
-        *it *= 2024;
-    }
+    std::string inputFilePath;
+    std::unordered_map<size_t, size_t> stoneNumToCount;
 };
 
 int main()
