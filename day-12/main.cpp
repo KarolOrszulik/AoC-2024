@@ -111,7 +111,7 @@ public:
 private:
     char at(Position p) const
     {
-        if (p.x < 0 || p.x >= width || p.x < 0 || p.y >= height)
+        if (p.x < 0 || p.x >= width || p.y < 0 || p.y >= height)
             return 0;
 
         return map[p.y * width + p.x];
