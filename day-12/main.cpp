@@ -3,6 +3,7 @@
 #include <vector>
 #include <unordered_set>
 #include <array>
+#include <functional>
 
 struct Position
 {
@@ -46,15 +47,15 @@ struct Region
         size_t perimeter = 0;
         for (auto const pos : positions)
         {
-            // for (auto const [dx, dy] : Position::getPositionDeltas())
-            //     perimeter += 1 - positions.count({pos.x + dx, pos.y + dy});
-
-            perimeter += 1 - positions.count({pos.x + 1, pos.y + 0});
-            perimeter += 1 - positions.count({pos.x - 1, pos.y + 0});
-            perimeter += 1 - positions.count({pos.x + 0, pos.y + 1});
-            perimeter += 1 - positions.count({pos.x + 0, pos.y - 1});
+            for (auto const [dx, dy] : Position::getPositionDeltas())
+                perimeter += 1 - positions.count({pos.x + dx, pos.y + dy});
         }
         return perimeter;
+    }
+
+    size_t getNumSides() const
+    {
+        return 1;
     }
 };
 
@@ -96,7 +97,7 @@ public:
                 if (visitedPositions.count({x, y}))
                     continue;
                 
-                Region currentRegion = floodFillFrom({x, y});
+                Region currentRegion = getRegionContaining({x, y});
 
                 for (auto pos : currentRegion.positions)
                     visitedPositions.insert(pos);
@@ -117,18 +118,12 @@ private:
         return map[p.y * width + p.x];
     }
 
-    Region floodFillFrom(Position pos) const
+    Region getRegionContaining(Position pos) const
     {
         Region region;
-        region.positions.insert(pos);
-
         const char targetChar = at(pos);
-
-        for (auto const [dx, dy] : Position::getPositionDeltas())
-        {
-            Position newPos = { pos.x + dx, pos.y + dy };
-            floodFillFrom(newPos, targetChar, region);
-        }
+        
+        floodFillFrom(pos, targetChar, region);
 
         return region;
     }
@@ -162,22 +157,35 @@ public:
 
     size_t part1() const
     {
-        size_t sum = 0;
-        for (auto r : farm.getRegions())
-        {
-            size_t a = r.getArea();
-            size_t p = r.getPerimeter();
-            sum += r.getArea() *  r.getPerimeter();
-        }
-        return sum;
+        return partCommon([this](Region const& r) { return this->regionPricePart1(r); });
     }
 
     size_t part2() const
     {
-        return 0;
+        return partCommon([this](Region const& r) { return this->regionPricePart2(r); });
     }
 
 private:
+    size_t partCommon(std::function<size_t(Region const&)> price) const
+    {
+        size_t sum = 0;
+        for (auto r : farm.getRegions())
+        {
+            sum += price(r);
+        }
+        return sum;
+    }
+
+    size_t regionPricePart1(Region const& r) const
+    {
+        return r.getArea() * r.getPerimeter();
+    }
+
+    size_t regionPricePart2(Region const& r) const
+    {
+        return r.getArea() * r.getNumSides();
+    }
+
     Farm farm;
 };
 
