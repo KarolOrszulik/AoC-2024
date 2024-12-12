@@ -192,7 +192,7 @@ private:
 int main()
 {
     Solution solution;
-    solution.loadInputFromFile("../input_smaller.txt");
+    solution.loadInputFromFile("../input.txt");
 
     std::cout << solution.part1() << std::endl;
     std::cout << solution.part2() << std::endl;
