@@ -1,5 +1,3 @@
-AAAAAA
-AAAAAA
-AA....
-A.AAA.
-A.....
+EEE
+E..
+EEE

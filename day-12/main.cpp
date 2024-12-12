@@ -55,7 +55,7 @@ struct Region
 
     size_t getNumSides() const
     {
-        return 1;
+        return 0;
     }
 };
 
@@ -192,7 +192,7 @@ private:
 int main()
 {
     Solution solution;
-    solution.loadInputFromFile("../input.txt");
+    solution.loadInputFromFile("../input_smaller.txt");
 
     std::cout << solution.part1() << std::endl;
     std::cout << solution.part2() << std::endl;
