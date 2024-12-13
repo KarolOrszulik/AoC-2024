@@ -58,6 +58,24 @@ struct Region
     {
         size_t numSides = 0;
 
+        auto processSlice = [this, &numSides] (int constant, int start, int end, int dx, int dy, bool isHorizontal) {
+            bool wasOnEdge = false;
+            for (int pos = start; pos <= end; pos++)
+            {
+                const int x = isHorizontal ? pos : constant;
+                const int y = isHorizontal ? constant : pos;
+
+                const bool isInside = positions.count({x, y});
+                const bool isNeighbourInside = positions.count({x+dx, y+dy});
+                const bool isOnEdge = isInside && !isNeighbourInside;
+                
+                if (isOnEdge && !wasOnEdge)
+                    numSides++;
+
+                wasOnEdge = isOnEdge;
+            }
+        };
+
         for (auto const [dx, dy] : Position::getPositionDeltas())
         {
             const auto [minX, maxX] = getExtremesX();
@@ -66,40 +84,12 @@ struct Region
             if (dx == 0)
             {
                 for (int y = minY; y <= maxY; y++)
-                {
-                    bool wasOnEdge = false;
-                    for (int x = minX; x <= maxX; x++)
-                    {
-                        const bool isInside = positions.count({x, y});
-                        const bool neighbourIsInside = positions.count({x, y+dy});
-
-                        const bool isOnEdge = isInside && !neighbourIsInside;
-                        
-                        if (isOnEdge && !wasOnEdge)
-                            numSides++;
-
-                        wasOnEdge = isOnEdge;
-                    }
-                }
+                    processSlice(y, minX, maxX, dx, dy, true);
             }
-            else if (dy == 0)
+            else // dy = 0
             {
                 for (int x = minX; x <= maxX; x++)
-                {
-                    bool wasOnEdge = false;
-                    for (int y = minY; y <= maxY; y++)
-                    {
-                        const bool isInside = positions.count({x, y});
-                        const bool neighbourIsInside = positions.count({x+dx, y});
-
-                        const bool isOnEdge = isInside && !neighbourIsInside;
-                        
-                        if (isOnEdge && !wasOnEdge)
-                            numSides++;
-
-                        wasOnEdge = isOnEdge;
-                    }
-                }
+                    processSlice(x, minY, maxY, dx, dy, false);
             }
         }
 
