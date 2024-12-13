@@ -4,6 +4,7 @@
 #include <unordered_set>
 #include <array>
 #include <functional>
+#include <algorithm>
 
 struct Position
 {
@@ -55,7 +56,66 @@ struct Region
 
     size_t getNumSides() const
     {
-        return 0;
+        size_t numSides = 0;
+
+        for (auto const [dx, dy] : Position::getPositionDeltas())
+        {
+            const auto [minX, maxX] = getExtremesX();
+            const auto [minY, maxY] = getExtremesY();
+
+            if (dx == 0)
+            {
+                for (int y = minY; y <= maxY; y++)
+                {
+                    bool wasOnEdge = false;
+                    for (int x = minX; x <= maxX; x++)
+                    {
+                        const bool isInside = positions.count({x, y});
+                        const bool neighbourIsInside = positions.count({x, y+dy});
+
+                        const bool isOnEdge = isInside && !neighbourIsInside;
+                        
+                        if (isOnEdge && !wasOnEdge)
+                            numSides++;
+
+                        wasOnEdge = isOnEdge;
+                    }
+                }
+            }
+            else if (dy == 0)
+            {
+                for (int x = minX; x <= maxX; x++)
+                {
+                    bool wasOnEdge = false;
+                    for (int y = minY; y <= maxY; y++)
+                    {
+                        const bool isInside = positions.count({x, y});
+                        const bool neighbourIsInside = positions.count({x+dx, y});
+
+                        const bool isOnEdge = isInside && !neighbourIsInside;
+                        
+                        if (isOnEdge && !wasOnEdge)
+                            numSides++;
+
+                        wasOnEdge = isOnEdge;
+                    }
+                }
+            }
+        }
+
+        return numSides;
+    }
+
+    std::pair<int, int> getExtremesX() const
+    {
+        auto minmax = std::minmax_element(positions.begin(), positions.end(), [] (Position const& a, Position const& b) { return a.x < b.x; });
+        return { minmax.first->x, minmax.second->x };
+    }
+
+    std::pair<int, int> getExtremesY() const
+    {
+        auto minmax = std::minmax_element(positions.begin(), positions.end(), [] (Position const& a, Position const& b) { return a.y < b.y; });
+        return { minmax.first->y, minmax.second->y };
     }
 };
 

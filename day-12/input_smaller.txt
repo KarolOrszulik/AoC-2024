@@ -1,3 +1,4 @@
-EEE
-E..
-EEE
+....
+EEE.
+E...
+EEE.
