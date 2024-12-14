@@ -79,28 +79,6 @@ public:
         return *std::min_element(prices.begin(), prices.end());
     }
 
-    // input: target, n[x, y]
-    // output: all possible pairs a[x, y] such that n[x]*a[x] + n[y]+a[y] = target
-    // std::vector<vec2l> possibleCoefficients(long long T, vec2l n) const
-    // {
-    //     std::vector<vec2l> result;
-
-    //     const long long MAX_OF_FIRST = T / n.x + 1;
-    //     for (long long i = 0; i <= MAX_OF_FIRST; i++)
-    //     {
-    //         const long long MAX_OF_SECOND = (T - i * n.x) / n.y + 1;
-    //         for (long long j = 0; j < MAX_OF_SECOND; j++)
-    //         {
-    //             if (i * n.x + j * n.y == T)
-    //             {
-    //                 result.push_back({i, j});
-    //                 continue;
-    //             }
-    //         }
-    //     }
-
-    //     return result;
-    // }
 
     std::vector<vec2l> possibleCoefficients(long long T, vec2l n) const
     {
@@ -112,15 +90,9 @@ public:
             return {};
         }
 
-        long da, db;
-        for (long div = 1; div <= n.x && div <= n.y; div++)
-        {
-            if (n.x % div == 0 && n.y % div == 0)
-            {
-                da = n.y / div;
-                db = n.x / div;
-            }
-        }
+        const long gcd = std::__gcd(n.x, n.y);
+        const long da = n.y / gcd;
+        const long db = n.x / gcd;
 
         auto [a, b] = opt.value();
         while (b >= 0)
@@ -133,18 +105,18 @@ public:
         return result;
     }
 
-    std::optional<vec2l> findFirstPossibleCoefficient(long long T, vec2l n) const
+    std::optional<vec2l> findFirstPossibleCoefficient(long long T, vec2l n, long minx = 0) const
     {
+        long gcd = std::__gcd(n.x, n.y);
+        if (T % gcd != 0)
+            return {};
+
         const long long MAX_OF_FIRST = T / n.x + 1;
-        for (long long i = 0; i <= MAX_OF_FIRST; i++)
+        for (long long i = minx; i <= MAX_OF_FIRST; i++)
         {
-            const long long MIN_OF_SECOND = (T - i * n.x) / n.y + 1;
-            for (long long j = MIN_OF_SECOND; j >= 0; j--)
+            if ((T - i * n.x) % n.y == 0)
             {
-                if (i * n.x + j * n.y == T)
-                {
-                    return {{i, j}};
-                }
+                return {{i, (T - i * n.x) / n.y}};
             }
         }
         return {};
