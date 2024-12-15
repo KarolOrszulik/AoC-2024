@@ -14,25 +14,7 @@ struct vec2l
     {
         return vec2l { x + other.x, y + other.y };
     }
-
-    bool operator==(vec2l const& other) const
-    {
-        return x == other.x && y == other.y;
-    }
 };
-
-namespace std
-{
-    template<>
-    struct hash<vec2l>
-    {
-        size_t operator()(vec2l const& vec) const
-        {
-            return vec.x << 32 | vec.y;
-        }
-    };
-}
-
 
 enum class Tile
 {
@@ -63,43 +45,23 @@ public:
             return;
         }
 
-        tiles.clear();
-        directions = std::queue<Direction>(); // why does it not have a clear() method?
-        size.x = 0;
-        size.y = 0;
+        clearData();
 
-        bool doneReadingMap = false;
+        bool stillReadingMap = true;
         std::string line;
+
         while (std::getline(file, line))
         {
             if (line.empty())
             {
-                doneReadingMap = true;
+                stillReadingMap = false;
                 continue;
             }
 
-            if (!doneReadingMap)
-            {
-                size.x = line.length();
-
-                for (int i = 0; i < line.length(); i++)
-                {
-                    Tile tile = static_cast<Tile>(line[i]);
-                    if (tile == Tile::ROBOT)
-                        robotPos = {i, size.y};
-
-                    tiles.push_back(tile);
-                }
-
-                size.y++;
-            }
+            if (stillReadingMap)
+                parseLineAsMap(line);
             else
-            {
-                for (char c : line)
-                {
-                    directions.push(static_cast<Direction>(c));
-                }
-            }
+                parseLineAsDirections(line);
         }
     }
 
@@ -120,38 +82,60 @@ public:
         
         vec2l pos = optPos.value();
 
-        Tile moved;
-        do
+        Tile moved = Tile::INVALID;
+        while (moved != Tile::ROBOT)
         {
-            moved = at(pos + delta);           
+            moved = at(pos + delta);       
+
+            if (moved == Tile::ROBOT)
+                robotPos = pos;
+
             setTile(pos, moved);
             setTile(pos + delta, Tile::EMPTY);
-
-            if (at(pos) == Tile::ROBOT)
-                robotPos = pos;
-                
             pos = pos + delta;
-
-        } while (moved != Tile::ROBOT);
+        }
     }
 
     size_t sumOfGPScoordinates() const
     {
         size_t total = 0;
+
         for (int y = 0; y < size.y; y++)
-        {
             for (int x = 0; x < size.x; x++)
-            {
-                if (at({x, y}) != Tile::BOX)
-                    continue;
-                
-                total += GPScoordinate({x, y});
-            }
-        }
+                if (at({x, y}) == Tile::BOX)
+                    total += GPScoordinate({x, y});
+
         return total;
     }
 
 private:
+    void clearData()
+    {
+        tiles.clear();
+        directions = std::queue<Direction>(); // why does it not have a clear() method?
+        size.x = 0;
+        size.y = 0;
+    }
+
+    void parseLineAsMap(std::string const& line)
+    {
+        for (int i = 0; i < line.length(); i++)
+        {
+            Tile tile = static_cast<Tile>(line[i]);
+            if (tile == Tile::ROBOT)
+                robotPos = {i, size.y};
+
+            tiles.push_back(tile);
+        }
+        size.x = line.length();
+        size.y++;
+    }
+
+    void parseLineAsDirections(std::string const& line)
+    {
+        for (char c : line)
+            directions.push(static_cast<Direction>(c));
+    }
 
     std::optional<vec2l> firstEmptySpotToMove() const
     {
@@ -160,7 +144,7 @@ private:
         while (true)
         {
             pos = pos + delta;
-            Tile atPos =  at(pos);
+            Tile atPos = at(pos);
 
             if (atPos == Tile::EMPTY)
                 return pos;
@@ -192,6 +176,7 @@ private:
     {
         if (at(pos) == Tile::INVALID)
             return;
+            
         tiles[pos.x + pos.y * size.x] = tile;
     }
 
