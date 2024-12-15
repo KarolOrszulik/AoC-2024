@@ -1,8 +1,11 @@
 #include <iostream>
 #include <fstream>
 #include <regex>
-#include <vector>
+#include <unordered_set>
 #include <optional>
+
+static constexpr long HALL_WIDTH = 101;
+static constexpr long HALL_HEIGHT = 103;
 
 struct vec2l
 {
@@ -20,13 +23,22 @@ struct vec2l
     }
 };
 
+namespace std
+{
+    template<>
+    struct hash<vec2l>
+    {
+        size_t operator()(vec2l const& vec) const
+        {
+            return vec.x << 32 | vec.y;
+        }
+    };
+}
+
 struct Robot
 {
     vec2l position;
     vec2l velocity;
-
-    static constexpr long HALL_WIDTH = 101;
-    static constexpr long HALL_HEIGHT = 103;
 
     void move()
     {
@@ -54,6 +66,7 @@ struct BathroomHall
 
     void loadFromFile(const char* path)
     {
+        robots.clear();
         std::ifstream file(path);
 
         if (!file)
@@ -70,30 +83,20 @@ struct BathroomHall
             robots.push_back(std::move(robot));
         }
     }
-};
 
-
-class Solution
-{
-public:
-    void loadInputFromFile(const char* path)
-    {
-        hall.loadFromFile(path);
-    }
-
-    size_t part1()
+    size_t getProductOfQuadrantCounts()
     {
         constexpr long ITERATIONS = 100;
         constexpr long NUM_QUADRANTS = 4;
 
         size_t quadrants[NUM_QUADRANTS] = {};
 
-        for (auto& robot : hall.robots)
+        for (auto& robot : robots)
         {
             for (long i = 0; i < ITERATIONS; i++)
                 robot.move();
 
-            auto quadrantIdx = quadrant(robot.position);
+            auto quadrantIdx = getQuadrantIdx(robot.position);
             if (quadrantIdx.has_value())
                 quadrants[quadrantIdx.value()]++;
         }
@@ -106,19 +109,23 @@ public:
         return total;
     }
 
-    size_t part2() const
+    bool isMakingChristmasTree()
     {
-        return 0;
+        std::unordered_set<vec2l> robotPositions;
+        for (auto const& r : robots)
+            robotPositions.insert(r.position);
+        
+        return robotPositions == getChristmasTreePositions();
     }
 
 private:
-    std::optional<int> quadrant(vec2l pos) const
+    std::optional<int> getQuadrantIdx(vec2l pos) const
     {
-        static_assert(Robot::HALL_HEIGHT % 2 == 1);
-        static_assert(Robot::HALL_WIDTH % 2 == 1);
+        static_assert(HALL_HEIGHT % 2 == 1);
+        static_assert(HALL_WIDTH % 2 == 1);
 
-        constexpr int middleRow = Robot::HALL_HEIGHT / 2;
-        constexpr int middleCol = Robot::HALL_WIDTH / 2;
+        constexpr int middleRow = HALL_HEIGHT / 2;
+        constexpr int middleCol = HALL_WIDTH / 2;
 
         if (pos.x == middleCol || pos.y == middleRow)
             return {};
@@ -129,14 +136,71 @@ private:
         return y * 2 + x;
     }
 
+    static std::unordered_set<vec2l> getChristmasTreePositions()
+    {
+        static std::unordered_set<vec2l> positions;
+
+        if (!positions.empty())
+            return positions;
+        
+        // needles
+        for (int y = 0; y < HALL_HEIGHT - 1; y++)
+        {
+            const int treeWidth = 1 + 2*(y-1);
+            const int blankBeforeTree = (HALL_WIDTH - treeWidth) / 2;
+
+            for (int x = blankBeforeTree; x < blankBeforeTree + treeWidth; x++)
+            {
+                positions.insert({x, y});
+            }
+        }
+
+        // trunk
+        positions.insert({HALL_WIDTH / 2, HALL_HEIGHT - 1});
+
+        return positions;
+    }
+};
+
+
+class Solution
+{
+public:
+    void setInputFilePath(const char* path)
+    {
+        inputPath = path;
+    }
+
+    size_t part1()
+    {
+        hall.loadFromFile(inputPath.c_str());
+        return hall.getProductOfQuadrantCounts();
+    }
+
+    size_t part2()
+    {
+        hall.loadFromFile(inputPath.c_str());
+
+        size_t seconds = 0;
+        while (!hall.isMakingChristmasTree())
+        {
+            seconds++;
+            for (auto& robot : hall.robots)
+                robot.move();
+        }
+        return seconds;
+    }
+
+private:
     BathroomHall hall;
+    std::string inputPath;
 };
 
 
 int main()
 {
     Solution solution;
-    solution.loadInputFromFile("../input.txt");
+    solution.setInputFilePath("../input.txt");
 
     std::cout << solution.part1() << std::endl;
     std::cout << solution.part2() << std::endl;
