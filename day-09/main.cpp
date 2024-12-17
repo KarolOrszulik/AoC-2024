@@ -2,16 +2,15 @@
 #include <fstream>
 #include <vector>
 #include <string>
-#include <algorithm>
-#include <list>
+#include <cassert>
 
-using ID_t = size_t;
-static constexpr ID_t EMPTY_ID = -1;
 
-// only works for part 1
-class VectorDiskImage
+class DiskImage
 {
 public:
+    using id_t = size_t;
+    static constexpr id_t EMPTY_ID = -1;
+
     void loadFromFile(std::string const& path)
     {
         std::ifstream file(path);
@@ -23,7 +22,7 @@ public:
             return;
         }
 
-        ID_t currID = 0;
+        id_t currID = 0;
         bool isFile = true;
 
         char c;
@@ -59,169 +58,88 @@ public:
         }
     }
 
+    void defragmentWithoutSplittingFiles()
+    {
+        id_t minFileID = -1;
+
+        assert(minFileID > 0); // make sure id is unsigned and overflowed to max
+
+        for (int i = disk.size() - 1; i >= 0;)
+        {
+            auto const [fileID, fileStart, fileSize] = findFirstFileAtOrBeforePos(i);
+
+            if (fileID < minFileID)
+            {
+                minFileID = fileID;
+                const int emptyIdx = findFirstEmptySpace(fileSize);
+
+                if (emptyIdx != -1 && emptyIdx < fileStart)
+                    for (int j = 0; j < fileSize; j++)
+                        std::swap(disk[fileStart + j], disk[emptyIdx + j]);
+            }
+            
+            i = fileStart - 1;
+        }
+    }
+
     size_t getChecksum() const
     {
         size_t sum = 0;
+        size_t slot = 0;
         for (size_t i = 0; i < disk.size(); i++)
         {
             size_t num = disk[i];
-            if (num == EMPTY_ID)
-                break;
 
-            sum += i * num;
+            if (num != EMPTY_ID)
+                sum += slot * num;
+            
+            slot++;
         }
         return sum;
     }
 
 private:
-    size_t findFirstEmptySpace()
+    int findFirstEmptySpace(int minSize = 1)
     {
-        for (size_t i = 0; i < disk.size(); i++)
-            if (disk[i] == EMPTY_ID)
-                return i;
-        
+        for (int i = 0; i <= disk.size() - minSize; i++)
+        {
+            if (disk[i] != EMPTY_ID)
+                continue;
+
+            for (int j = 0; j < minSize; j++)
+            {
+                if (disk[i+j] != EMPTY_ID)
+                    break;
+
+                if (j == minSize - 1)
+                    return i;
+            }
+        }
         return -1;
     }
 
-    std::vector<ID_t> disk;
-};
-
-
-// works for both parts but for part 1 is much slower than VectorDiskImage
-class ListDiskImage
-{
-public:
-    void loadFromFileForPart(std::string const& path, int part)
+    std::tuple<id_t, int, int> findFirstFileAtOrBeforePos(int pos)
     {
-        disk.clear();
-        std::ifstream file(path);
+        // this algorithm assumes there IS a file at or before the given position
+        // for the input format this task uses, this will always be the case
+        // because the disk always starts with a file
 
-        if (!file)
-        {
-            std::cerr << "Could not open input file" << std::endl;
-            return;
-        }
+        while (disk[pos] == EMPTY_ID)
+            pos--;
+        
+        const int fileEnd = pos;
+        const id_t fileID = disk[pos];
 
-        size_t currIdx = 0;
-        bool isFile = true;
+        while (pos >= 0 && disk[pos] == fileID)
+            pos--;
+        
+        const int fileStart = pos + 1;
+        const int fileSize = fileEnd - fileStart + 1;
 
-        char c;
-        while (file >> c)
-        {
-            size_t size = c - '0';
-            size_t id = isFile ? currIdx : EMPTY_ID;
-            
-
-            if (part == 1)
-                createFilesForPart1(size, id);
-            else if (part == 2)
-                createFileForPart2(size, id);
-            else
-                throw "Invalid part number, only 1 and 2 permitted";
-
-
-            if (isFile)
-                currIdx++;
-
-            isFile = !isFile;
-        }
+        return { fileID, fileStart, fileSize };
     }
 
-    void defragment()
-    {
-        for (auto it = disk.rbegin(); it != disk.rend(); ++it)
-        {
-            if (it->id == EMPTY_ID)
-                continue;
-
-            const auto [emptySpotIt, emptySpotIdx] = firstEmptySpaceOfMinSize(it->size);
-            const size_t itIdx = disk.size() - 1 - std::distance(disk.rbegin(), it);
-
-            if (emptySpotIt == disk.end() || emptySpotIdx >= itIdx)
-                continue;
-
-            // decrease empty space size and insert copied file descriptor at its beginning
-            emptySpotIt->size -= it->size;
-            disk.insert(emptySpotIt, *it);
-
-            // set old file's id to empty space to be removed in the next step
-            it->id = EMPTY_ID;
-
-            // merge all subsequent empty spaces into 1 big one and several 0-size ones
-            mergeEmptySpace();
-        }
-
-        // delete 0-sized files (not actually necessary?) - confirmed, works without, and slightly faster, too
-        // eraseZeroLengthDescriptors();
-    }
-
-    size_t getChecksum() const
-    {
-        size_t sum = 0;
-        size_t idx = 0;
-        for (Descriptor const& file : disk)
-        {           
-            for (int i = 0; i < file.size; i++)
-            {
-                sum += file.id == EMPTY_ID ? 0 : file.id * idx;
-                idx++;
-            }
-        }
-        return sum;
-    }
-
-private:
-    struct Descriptor
-    {
-        size_t size;
-        ID_t id;
-    };
-
-    void createFilesForPart1(size_t size, ID_t id)
-    {
-        for (size_t i = 0; i < size; i++)
-            disk.push_back({1, id});
-    }
-
-    void createFileForPart2(size_t size, ID_t id)
-    {
-        disk.push_back({size, id});
-    }
-
-    std::pair<std::list<Descriptor>::iterator, size_t> firstEmptySpaceOfMinSize(size_t minSize)
-    {
-        size_t idx = 0;
-        for (auto it = disk.begin(); it != disk.end(); ++it, ++idx)
-        {
-            if (it->id == EMPTY_ID && it->size >= minSize)
-                return { it, idx };
-        }
-        return { disk.end(), -1 };
-    }
-
-    void mergeEmptySpace()
-    {
-        for (auto it = disk.rbegin(); it != disk.rend(); ++it)
-        {
-            if (it->id != EMPTY_ID)
-                continue;
-            
-            auto nextIt = std::next(it);
-
-            if (nextIt != disk.rend() && nextIt->id == EMPTY_ID)
-            {
-                nextIt->size += it->size;
-                it->size = 0;
-            }
-        }
-    }
-
-    void eraseZeroLengthDescriptors()
-    {
-        disk.erase(std::remove_if(disk.begin(), disk.end(), [](auto const& d) { return d.size == 0; }), disk.end());
-    }
-
-    std::list<Descriptor> disk;
+    std::vector<id_t> disk;
 };
 
 
@@ -235,24 +153,17 @@ public:
 
     size_t part1() const
     {
-        // #define USE_LIST_IMPLEMENTATION
-
-#ifdef USE_LIST_IMPLEMENTATION
-            ListDiskImage image;
-            image.loadFromFileForPart(inputPath, 1); // works slowly
-#else
-            VectorDiskImage image;
-            image.loadFromFile(inputPath);
-#endif
-            image.defragment();
-            return image.getChecksum();
+        DiskImage image;
+        image.loadFromFile(inputPath);
+        image.defragment();
+        return image.getChecksum();
     }
 
     size_t part2() const
     {
-        ListDiskImage image;
-        image.loadFromFileForPart(inputPath, 2);
-        image.defragment();
+        DiskImage image;
+        image.loadFromFile(inputPath);
+        image.defragmentWithoutSplittingFiles();
         return image.getChecksum();
     }
 
