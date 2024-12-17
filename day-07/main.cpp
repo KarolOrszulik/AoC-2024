@@ -4,8 +4,6 @@
 #include <vector>
 #include <string>
 #include <cassert>
-#include <thread>
-#include <future>
 
 struct Equation
 {
@@ -65,7 +63,7 @@ struct Equation
             return static_cast<Operator>((bitmask >> (i * BITS_PER_OPERATOR)) & 0b11);
         };
 
-        auto validateBitmast = [numOperators, ithOperator] (bitmask_t bitmask) -> bool {
+        auto validateBitmask = [numOperators, ithOperator] (bitmask_t bitmask) -> bool {
             bool hasConcat = false;
             for (int i = 0; i < numOperators; i++)
             {
@@ -82,7 +80,7 @@ struct Equation
         const int numBitmasks = 1 << (numOperators * BITS_PER_OPERATOR);
         for (bitmask_t bitmask = 0; bitmask < numBitmasks; bitmask++)
         {
-            if (!validateBitmast(bitmask))
+            if (!validateBitmask(bitmask))
                 continue;
 
             size_t total = operands[0];
@@ -101,7 +99,7 @@ struct Equation
                     total *= otherOperand;
                     break;
                 case Operator::CONCATENATE:
-                    total = std::stoul(std::to_string(total) + std::to_string(otherOperand));
+                    total = total * powerOf10(numDigits(otherOperand)) + otherOperand;
                     break;
                 }
             }
@@ -112,6 +110,25 @@ struct Equation
 
         return false;
     };
+
+    int numDigits(size_t n) const
+    {
+        int count = 0;
+        while (n != 0)
+        {
+            n /= 10;
+            count++;
+        }
+        return count;
+    }
+
+    size_t powerOf10(int n) const
+    {
+        size_t result = 1;
+        for (int i = 0; i < n; i++)
+            result *= 10;
+        return result;
+    }
 };
 
 class Solution
@@ -147,19 +164,12 @@ public:
     
     size_t part2() const
     {
-        std::vector<std::future<size_t>> futures;
-
+        size_t sum = 0;
         for (Equation const& eq : equations)
         {
-            futures.push_back(std::async([&eq] { return eq.canBeValidForThreeOperators() ? eq.result : 0; }));
+            if (eq.canBeValidForThreeOperators())
+                sum += eq.result;
         }
-
-        size_t sum = 0;
-        for (auto& future : futures)
-        {
-            sum += future.get();
-        }
-
         return sum;
     }
 
