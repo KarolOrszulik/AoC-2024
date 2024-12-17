@@ -54,72 +54,23 @@ public:
 
     std::optional<size_t> getMinimumWinningPrice() const
     {
-        const std::vector<vec2l> possibleForX = possibleCoefficients(target.x, {buttonA.deltas.x, buttonB.deltas.x});
-        const std::vector<vec2l> possibleForY = possibleCoefficients(target.y, {buttonA.deltas.y, buttonB.deltas.y});
+        const long xa = buttonA.deltas.x;
+        const long ya = buttonA.deltas.y;
 
-        std::vector<vec2l> possible;
-        for (auto const posX : possibleForX)
-        {
-            for (auto const posY : possibleForY)
-            {
-                if (posX == posY)
-                    possible.push_back(posX);
-            }
-        }
-
-        if (possible.empty())
-            return {};
-
-        std::vector<int> prices;
-        prices.reserve(possible.size());
-
-        for (auto const p : possible)
-            prices.push_back(buttonA.price * p.x + buttonB.price * p.y);
+        const long xb = buttonB.deltas.x;
+        const long yb = buttonB.deltas.y;
         
-        return *std::min_element(prices.begin(), prices.end());
-    }
+        const long xt = target.x;
+        const long yt = target.y;
 
+        const long det = xa*yb - xb*ya;
+        const long detA = xt*yb - yt*xb;
+        const long detB = yt*xa - ya*xt;
 
-    std::vector<vec2l> possibleCoefficients(long long T, vec2l n) const
-    {
-        std::vector<vec2l> result;
-
-        auto opt = findFirstPossibleCoefficient(T, n);
-        if (!opt.has_value())
-        {
+        if (det == 0 || detA % det != 0 || detB % det != 0)
             return {};
-        }
-
-        const long gcd = std::__gcd(n.x, n.y);
-        const long da = n.y / gcd;
-        const long db = n.x / gcd;
-
-        auto [a, b] = opt.value();
-        while (b >= 0)
-        {
-            result.push_back({a, b});
-            a += da;
-            b -= db;
-        }
-
-        return result;
-    }
-
-    std::optional<vec2l> findFirstPossibleCoefficient(long long T, vec2l n, long minx = 0) const
-    {
-        long gcd = std::__gcd(n.x, n.y);
-        if (T % gcd != 0)
-            return {};
-
-        const long long MAX_OF_FIRST = T / n.x + 1;
-        for (long long i = minx; i <= MAX_OF_FIRST; i++)
-        {
-            if ((T - i * n.x) % n.y == 0)
-            {
-                return {{i, (T - i * n.x) / n.y}};
-            }
-        }
-        return {};
+        
+        return buttonA.price * (detA / det) + buttonB.price * (detB / det);
     }
 
     void moveTarget(vec2l shift)
