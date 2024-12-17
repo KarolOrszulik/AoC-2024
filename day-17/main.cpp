@@ -3,6 +3,8 @@
 #include <vector>
 #include <regex>
 #include <array>
+#include <thread>
+#include <atomic>
 
 class CPU
 {
@@ -25,6 +27,23 @@ public:
         while (!isHalted())
             step();
         return flushOutputBuffer();
+    }
+
+    bool isSelfReplicating()
+    {
+        while (!isHalted())
+        {
+            step();
+            if (outputBuffer.empty())
+                continue;
+
+            if (outputBuffer.size() > memory.size())
+                return false;
+            
+            if (outputBuffer.back() != memory[outputBuffer.size() - 1])
+                return false;
+        }
+        return outputBuffer.size() == memory.size();
     }
 
 private:
@@ -65,8 +84,19 @@ private:
 
     std::string flushOutputBuffer()
     {
-        std::string output = outputBuffer;
-        outputBuffer.clear();
+        if (outputBuffer.empty())
+            return "";
+        
+        std::string output;
+
+        for (size_t i = 0; i < outputBuffer.size(); i++)
+        {
+            if (i != 0)
+                output += ',';
+
+            output += std::to_string(outputBuffer[i]);
+        }
+
         return output;
     }
 
@@ -169,19 +199,16 @@ private:
 
     void executeOUT(register_t op)
     {
-        if (!outputBuffer.empty())
-            outputBuffer += ",";
-
-        outputBuffer += std::to_string(op % 8);
+        outputBuffer.push_back(op % 8);
     }
 
-    std::vector<memory_t> memory;
-    std::array<register_t, NUM_REGISTERS> r;
+    Memory memory;
+    RegistersArray r;
 
     size_t ip = 0;
     int ipIncrement = 2;
 
-    std::string outputBuffer;
+    Memory outputBuffer;
 };
 
 class CPUParser
@@ -248,6 +275,7 @@ private:
     std::array<std::string, NUM_LINES> lines;
 };
 
+
 class Solution
 {
 public:
@@ -264,7 +292,53 @@ public:
 
     long part2() const
     {
-        return 0;
+        CPU::Memory const& memory = parser.getMemory();
+
+        // long i = 0;
+        // while (true)
+        // {
+        //     CPU cpu(memory, {i, 0, 0});
+
+        //     if (cpu.isSelfReplicating())
+        //         return i;
+            
+        //     if (i % 100'000'000 == 0)
+        //         std::cout << "Progress: " << i << '\n';
+
+        //     i++;
+        // }
+
+        const int NUM_THREADS = 16;
+        constexpr long STARTING_VALUE = 1730000000000;
+
+        std::atomic<long> result = -1;
+
+        std::vector<std::thread> threads;
+
+        auto worker = [&](long start, long step) {
+            for (long i = start + STARTING_VALUE; result < 0; i += step) {
+                CPU cpu(memory, {i, 0, 0});
+
+                if (cpu.isSelfReplicating()) {
+                    result.store(i);
+                    return;
+                }
+
+                if (i % 1'000'000'000 == start)
+                    std::cout << "Thread " << start << " progress: " << i << '\n';
+            }
+        };
+
+        for (long t = 0; t < NUM_THREADS; ++t) {
+            threads.emplace_back(worker, t, NUM_THREADS);
+        }
+
+        // Join all threads
+        for (auto& thread : threads) {
+            thread.join();
+        }
+
+        return result.load();
     }
 
 private:
@@ -278,4 +352,6 @@ int main()
 
     std::cout << solution.part1() << std::endl;
     std::cout << solution.part2() << std::endl;
+
+    // progress checkpoint: thread 0 started at 1'477'000'000'000
 }
