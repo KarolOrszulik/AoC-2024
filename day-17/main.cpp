@@ -2,19 +2,22 @@
 #include <fstream>
 #include <vector>
 #include <regex>
+#include <array>
 
 class CPU
 {
 public:
-    using memory_t = long;
+    static constexpr int NUM_REGISTERS = 3;
+
+    using memory_t = unsigned char;
     using register_t = long;
 
-    CPU(register_t aReg, register_t bReg, register_t cReg, std::vector<memory_t> const& memory)
-        : memory(memory)
+    using RegistersArray = std::array<CPU::register_t, CPU::NUM_REGISTERS>;
+    using Memory = std::vector<CPU::memory_t>;
+
+    CPU(Memory const& memory, RegistersArray const& registers)
+        : memory(memory), r(registers)
     {
-        r[A] = aReg;
-        r[B] = bReg;
-        r[C] = cReg;
     }
 
     std::string executeProgram()
@@ -173,9 +176,11 @@ private:
     }
 
     std::vector<memory_t> memory;
-    register_t r[3];
+    std::array<register_t, NUM_REGISTERS> r;
+
     size_t ip = 0;
     int ipIncrement = 2;
+
     std::string outputBuffer;
 };
 
@@ -186,7 +191,7 @@ public:
         : numberRegex("\\d+")
     {}
 
-    CPU parseFromFile(const char* path)
+    void parseFile(const char* path)
     {
         std::ifstream file(path);
 
@@ -196,25 +201,39 @@ public:
             throw;
         }
 
-        constexpr int NUM_LINES = 5;
-        std::string lines[NUM_LINES];
         for (int i = 0; i < NUM_LINES; i++)
-            std::getline(file, lines[i]);
-        
-        constexpr int NUM_REGISTERS = 3;
-        long reg[NUM_REGISTERS];
-        for (int i = 0; i < NUM_REGISTERS; i++)
-        {
-            std::sregex_iterator it(lines[i].begin(), lines[i].end(), numberRegex);
-            reg[i] = std::stol(it->str());
-        }
-
-        return CPU(reg[0], reg[1], reg[2], parseMemoryFromString(lines[4]));
+            std::getline(file, lines[i]);   
     }
 
-    std::vector<CPU::memory_t> parseMemoryFromString(std::string const& str)
+    CPU getCPU() const
     {
-        std::vector<CPU::memory_t> result;
+        CPU::RegistersArray reg = getRegisters();
+        CPU::Memory mem = getMemory();
+        return CPU(std::move(mem), std::move(reg));
+    }
+
+    CPU::RegistersArray getRegisters() const
+    {
+        CPU::RegistersArray registers;
+        for (int i = 0; i < registers.size(); i++)
+        {
+            std::sregex_iterator it(lines[i].begin(), lines[i].end(), numberRegex);
+            registers[i] = std::stol(it->str());
+        }
+        return registers;
+    }
+
+    std::string const& getMemoryString() const
+    {
+        constexpr int MEMORY_LINE_NUM = 4;
+        return lines[MEMORY_LINE_NUM];
+    }
+
+    CPU::Memory getMemory() const
+    {
+        CPU::Memory result;
+
+        const std::string& str = getMemoryString();
         for (std::sregex_iterator it(str.begin(), str.end(), numberRegex); it != std::sregex_iterator(); ++it)
         {
             result.push_back(std::stol(it->str()));
@@ -223,28 +242,40 @@ public:
     }
 
 private:
-    std::regex numberRegex;
+    const std::regex numberRegex;
+
+    static constexpr int NUM_LINES = CPU::NUM_REGISTERS + 2; // one empty and one for the program
+    std::array<std::string, NUM_LINES> lines;
 };
 
 class Solution
 {
 public:
-    std::string part1(CPU& cpu) const
+    void setInputFilePath(const char* path)
     {
+        parser.parseFile(path);
+    }
+
+    std::string part1() const
+    {
+        CPU cpu = parser.getCPU();
         return cpu.executeProgram();
     }
 
-    std::string part2(CPU& cpu) const
+    long part2() const
     {
-        return "";
+        return 0;
     }
+
+private:
+    CPUParser parser;
 };
 
 int main()
 {
-    CPU cpu = CPUParser().parseFromFile("../input.txt");
     Solution solution;
+    solution.setInputFilePath("../input.txt");
 
-    std::cout << solution.part1(cpu) << std::endl;
-    std::cout << solution.part2(cpu) << std::endl;
+    std::cout << solution.part1() << std::endl;
+    std::cout << solution.part2() << std::endl;
 }
