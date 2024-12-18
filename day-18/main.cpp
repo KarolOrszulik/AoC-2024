@@ -1,22 +1,17 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
-#include <limits>
 
-static constexpr bool IS_TEST_INPUT = false;
+static constexpr bool USE_TEST_INPUT = false;
 
-static constexpr int MAP_SIZE = IS_TEST_INPUT ? 7 : 71;
-static constexpr int PART_1_WALLS = IS_TEST_INPUT ? 12 : 1024;
+static constexpr int MAP_SIZE = USE_TEST_INPUT ? 7 : 71;
+static constexpr int PART_1_WALLS = USE_TEST_INPUT ? 12 : 1024;
+static constexpr const char* INPUT_FILE = USE_TEST_INPUT ? "../input_small.txt" : "../input.txt";
 
 struct Position
 {
     int x;
     int y;
-
-    bool operator==(Position const& other) const
-    {
-        return x == other.x && y == other.y;
-    }
 
     bool isValid() const
     {
@@ -27,22 +22,28 @@ struct Position
 class Tile
 {
 public:
-    static constexpr long MAX_DISTANCE = std::numeric_limits<long>::max();
+    constexpr static long MAX_DISTANCE = __INT64_MAX__;
 
     enum class Type
     {
-        INVALID,
-        EMPTY,
-        WALL,
+        SPACE,
+        WALL
     };
 
-    Tile(Type t = Type::INVALID)
-        : type(t), distanceToTarget(MAX_DISTANCE)
-    {}
-
-    Type getType() const
+    long getDistance() const
     {
-        return type;
+        if (isWall())
+            return MAX_DISTANCE;
+        
+        return distance;
+    }
+
+    void setDistance(long newDistance)
+    {
+        if (isWall())
+            return;
+        
+        distance = newDistance;
     }
 
     void makeWall()
@@ -50,33 +51,23 @@ public:
         type = Type::WALL;
     }
 
-    long getDistanceToTarget() const
+    bool isWall() const
     {
-        return distanceToTarget;
-    }
-
-    void setDistanceToTarget(long newDistance)
-    {
-        if (type != Type::EMPTY)
-            return;
-
-        if (newDistance < 0)
-            newDistance = MAX_DISTANCE;
-        
-        distanceToTarget = newDistance;
+        return type == Type::WALL;
     }
 
 private:
-    Type type;
-    long distanceToTarget;
+    Type type = Type::SPACE;
+    long distance = MAX_DISTANCE;
 };
+
 
 class Map
 {
 public:
     Map()
     {
-        tiles = std::vector<Tile>(MAP_SIZE * MAP_SIZE, Tile(Tile::Type::EMPTY));
+        resetMap();
     }
 
     void loadWallsFromFile(const char* path)
@@ -99,6 +90,11 @@ public:
         }
     }
 
+    void resetMap()
+    {
+        tiles = std::vector<Tile>(MAP_SIZE * MAP_SIZE);
+    }
+
     void placeWalls(int numWalls = -1)
     {
         if (numWalls == -1)
@@ -113,19 +109,37 @@ public:
 
     size_t distanceFromTo(Position from, Position to)
     {
-        at(to).setDistanceToTarget(0);
+        at(to).setDistance(0);
 
-        for (int i = 0; i < MAP_SIZE * MAP_SIZE; i++)
-        {
-            optimizePaths();
-        }
+        bool doneOptimizing = false;
+        while (!doneOptimizing)
+            doneOptimizing = optimizePaths();
 
-        return at(from).getDistanceToTarget();
+        return at(from).getDistance();
     }
 
-    Tile& at(Position pos)
+    bool existsPathFromTo(Position from, Position to)
     {
-        return tiles[pos.x + pos.y * MAP_SIZE];
+        at(to).setDistance(0);
+
+        bool doneOptimizing = false;
+        while (!doneOptimizing)
+        {
+            doneOptimizing = optimizePaths();
+            if (at(from).getDistance() != Tile::MAX_DISTANCE)
+                return true;
+        }
+        return false;
+    }
+
+    Position ithWall(int i) const
+    {
+        return walls[i];
+    }
+
+    int getNumWalls() const
+    {
+        return walls.size();
     }
 
 private:
@@ -136,38 +150,52 @@ private:
         {
             for (int x = 0; x < MAP_SIZE; x++)
             {
-                if (at({x, y}).getType() == Tile::Type::WALL)
-                    continue;
-                
-                long minDistance = Tile::MAX_DISTANCE;
-                for (auto const [dx, dy] : std::initializer_list<std::pair<int, int>>{ {1,0}, {0,1}, {-1,0}, {0,-1}})
-                {
-                    Position pos { x+dx, y+dy };
-                    if (!pos.isValid())
-                        continue;
-
-                    Tile::Type type = at(pos).getType();
-
-                    if (type == Tile::Type::WALL)
-                        continue;
-                    
-                    const long distance = at(pos).getDistanceToTarget();
-                    if (distance < minDistance)
-                        minDistance = distance;
-                }
-                if (minDistance == Tile::MAX_DISTANCE)
-                    continue;
-                
-                minDistance++;
-
-                if (minDistance < at({x,y}).getDistanceToTarget())
-                {
-                    doneOptimizing = false; // we were not done optimizing because an update was necessary
-                    at({x,y}).setDistanceToTarget(minDistance);
-                }
+                bool didOptimizePoint = optimizeAroundPoint({x, y});
+                if (didOptimizePoint)
+                    doneOptimizing = false;
             }
         }
         return doneOptimizing;
+    }
+
+    bool optimizeAroundPoint(Position pos)
+    {
+        if (at(pos).isWall())
+            return false;
+                
+        long minDistance = Tile::MAX_DISTANCE;
+
+        for (auto const [dx, dy] : std::initializer_list<std::pair<int, int>>{ {1,0}, {0,1}, {-1,0}, {0,-1}})
+        {
+            Position neighbour { pos.x+dx, pos.y+dy };
+            if (!neighbour.isValid() || at(neighbour).isWall())
+                continue;
+            
+            long distance = at(neighbour).getDistance();
+            if (distance == Tile::MAX_DISTANCE)
+                continue;
+
+            if (distance < minDistance)
+                minDistance = distance;
+        }
+
+        if (minDistance == Tile::MAX_DISTANCE)
+            return false;
+        
+        minDistance += 1; // one more step to end up on current tile
+        
+        long distToPos = at(pos).getDistance();
+        if (minDistance < distToPos)
+        {
+            at(pos).setDistance(minDistance);
+            return true;
+        }
+        return false;
+    }
+
+    Tile& at(Position pos)
+    {
+        return tiles[pos.x + pos.y * MAP_SIZE];
     }
 
     std::vector<Tile> tiles;
@@ -190,9 +218,21 @@ public:
         return map.distanceFromTo({0,0}, {MAP_SIZE-1, MAP_SIZE-1});
     }
 
-    size_t part2() const
+    std::string part2() const
     {
-        return 0;
+        Map map;
+        map.loadWallsFromFile(inputPath.c_str());
+        for (int i = PART_1_WALLS; i < map.getNumWalls(); i++)
+        {
+            map.placeWalls(i+1);
+            if (!map.existsPathFromTo({0,0}, {MAP_SIZE-1, MAP_SIZE-1}))
+            {
+                auto const [x, y] = map.ithWall(i);
+                return std::to_string(x) + "," + std::to_string(y);
+            }
+            map.resetMap();
+        }
+        return "Not found";
     }
 
 private:
@@ -202,7 +242,7 @@ private:
 int main()
 {
     Solution solution;
-    solution.setInputFilePath("../input.txt");
+    solution.setInputFilePath(INPUT_FILE);
 
     std::cout << solution.part1() << std::endl;
     std::cout << solution.part2() << std::endl;
