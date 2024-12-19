@@ -87,7 +87,18 @@ public:
 
     size_t part2() const
     {
-        return 0;
+        Parser parser;
+        parser.parseFile(inputPath.c_str());
+
+        size_t sum = 0;
+        size_t counter = 0;
+        for (auto const& design : parser.getDesiredDesigns())
+        {
+            std::cout << "Iteration " << counter++ << ": ";
+            sum += numWaysToConstruct(design, parser.getAvailableTowels());
+            std::cout << "sum so far: " << sum << "\n";
+        }
+        return sum;
     }
 
 private:
@@ -97,11 +108,7 @@ private:
             return true;
 
         for (const auto& towel : towels)
-        {
-            // can this check be omitted?
-            if (towel.length() > design.length())
-                continue;
-            
+        {            
             if (!isPrefix(design, towel))
                 continue;
             
@@ -112,6 +119,25 @@ private:
         }
 
         return false;
+    }
+
+    size_t numWaysToConstruct(std::string const& design, std::vector<std::string> const& towels) const
+    {
+        if (design.length() == 0)
+            return 1;
+
+        size_t sum = 0;
+
+        for (const auto& towel : towels)
+        {            
+            if (!isPrefix(design, towel))
+                continue;
+            
+            std::string shortenedDesign = design.substr(towel.length());
+            sum += numWaysToConstruct(shortenedDesign, towels);
+        }
+
+        return sum;
     }
 
     bool isPrefix(std::string const& string, std::string const& prefixCandidate) const
@@ -135,7 +161,7 @@ private:
 int main()
 {
     Solution solution;
-    solution.setInputFilePath("../input.txt");
+    solution.setInputFilePath("../input_small.txt");
 
     std::cout << solution.part1() << std::endl;
     std::cout << solution.part2() << std::endl;
