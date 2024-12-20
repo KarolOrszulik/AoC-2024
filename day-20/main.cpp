@@ -1,34 +1,30 @@
 #include <iostream>
 #include <fstream>
-#include <vector>
+#include <unordered_set>
+#include <unordered_map>
 
 struct Position
 {
     int x, y;
-};
 
-enum class Tile
-{
-    INVALID = 0,
-    PATH = '.',
-    WALL = '#'
-};
-
-class Maze
-{
-    friend class MazeParser;
-
-public:
-    Tile& at(Position pos)
+    bool operator==(Position const& p) const
     {
-        return tiles[pos.x + pos.y * width];
+        return x == p.x && y == p.y;
     }
-
-private:
-    std::vector<Tile> tiles;
-    int width = 0;
-    int height = 0;
 };
+
+namespace std
+{
+    template<>
+    struct hash<Position>
+    {
+        size_t operator()(Position const& p) const
+        {
+            return (size_t)p.x << 32 | (size_t)p.y;
+        }
+    };
+}
+
 
 
 class MazeParser
@@ -43,69 +39,73 @@ public:
             return;
         }
 
-        numPathTiles = 0;
-        maze.height = 0;
-        maze.tiles.clear();
+
 
         std::string line;
         for (int y = 0; std::getline(file, line); y++)
         {
-            maze.width = line.length();
-            for (int x = 0; x < maze.width; x++)
+            width = line.length();
+
+            for (int x = 0; x < width; x++)
             {
                 const char c = line[x];
-                Tile tile = static_cast<Tile>(c);
+                bool isPath = c == '.';
+                const Position pos = {x, y};
 
                 if (c == START_CHAR)
                 {
-                    startPos = {x, y};
-                    tile = Tile::PATH;
+                    startPos = pos;
+                    isPath = true;
                 }
                 else if (c == END_CHAR)
                 {
-                    endPos = {x, y};
-                    tile = Tile::PATH;
+                    endPos = pos;
+                    isPath = true;
                 }
-                
-                if (tile == Tile::PATH)
-                    numPathTiles++;
-                
-                maze.tiles.push_back(tile);                
+
+                if (isPath)
+                    pathPositions.insert(pos);
             }
-            maze.height++;
+
+            height++;
         }
     }
 
     std::pair<int, int> getSize() const
     {
-        return { maze.width, maze.height };
+        return { width, height };
+    }
+
+    bool isPath(Position pos) const
+    {
+        return pathPositions.count(pos);
     }
 
     int getNumPathTiles() const
     {
-        return numPathTiles;
+        return pathPositions.size();
     }
 
-    std::vector<Tile>& getTiles()
+    std::unordered_set<Position> const& getPathPositions() const
     {
-        return maze.tiles;
+        return pathPositions;
     }
 
-    Tile& at(Position pos)
-    {
-        return maze.at(pos);
-    }
+    Position getStartPos() const { return startPos; }
+    Position getEndPos() const { return endPos; }
 
 private:
     static constexpr char START_CHAR = 'S';
     static constexpr char END_CHAR = 'E';
+    static constexpr char PATH_CHAR = '.';
+
+    std::unordered_set<Position> pathPositions;
 
     Position startPos;
     Position endPos;
 
-    Maze maze;
-
-    int numPathTiles = 0;
+    int width = 0;
+    int height = 0;
 };
 
 class Solution
@@ -120,7 +120,7 @@ public:
     {
         parser.parseFile(inputPath.c_str());
 
-        constexpr size_t THRESHOLD = 100;
+        constexpr size_t THRESHOLD = 38;
         size_t numPathThatSaveAboveThreshold = 0;
 
         auto const [width, height] = parser.getSize();
@@ -145,17 +145,65 @@ public:
 private:
     size_t lengthOfPathForCheatAt(Position pos)
     {
+        if (parser.isPath(pos))
+            return parser.getNumPathTiles();
+
         size_t numNeighbours = 0;
         for (auto const [dx, dy] : std::initializer_list<std::pair<int,int>>{ {1,0}, {0,1}, {-1,0}, {0,-1}})
         {
-            if (parser.at({pos.x + dx, pos.y + dy}) == Tile::PATH)
+            if (parser.isPath({pos.x + dx, pos.y + dy}))
                 numNeighbours++;
         }
         if (numNeighbours < 2)
             return parser.getNumPathTiles();
         
-        
+        resetDistances();
+
+        auto paths = parser.getPathPositions();
+        paths.insert(pos);
+        optimizeDistances(paths);
+        return distanceToEnd[parser.getStartPos()];
     }
+
+    void optimizeDistances(std::unordered_set<Position> paths)
+    {
+        const int numPathTiles = paths.size();
+        const int numIterations = numPathTiles * numPathTiles;
+
+        for (int i = 0; i < numIterations; i++)
+        {
+            for (Position pos : paths)
+            {
+                for (auto const [dx, dy] : std::initializer_list<std::pair<int,int>>{ {1,0}, {0,1}, {-1,0}, {0,-1}})
+                {
+                    Position newPos = {pos.x + dx, pos.y + dy};
+                    if (!parser.isPath(newPos))
+                        continue;
+                    
+                    int newDistance = distanceToEnd[newPos];
+                    if (newDistance == __INT32_MAX__)
+                        continue;
+                    
+                    newDistance++;
+
+                    if (newDistance < distanceToEnd[pos])
+                        distanceToEnd[pos] = newDistance;
+                }
+            }
+        }
+    }
+
+    void resetDistances()
+    {
+        distanceToEnd.clear();
+        for (Position pos : parser.getPathPositions())
+        {
+            distanceToEnd[pos] = __INT32_MAX__;
+        }
+        distanceToEnd[parser.getEndPos()] = 0;
+    }
+
+    std::unordered_map<Position, int> distanceToEnd;
 
     std::string inputPath;
     MazeParser parser;
