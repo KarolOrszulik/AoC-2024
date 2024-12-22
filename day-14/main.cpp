@@ -109,13 +109,53 @@ struct BathroomHall
         return total;
     }
 
-    bool isMakingChristmasTree()
+    void moveRobots()
     {
-        std::unordered_set<vec2l> robotPositions;
-        for (auto const& r : robots)
-            robotPositions.insert(r.position);
-        
-        return robotPositions == getChristmasTreePositions();
+        for (auto& robot : robots)
+            robot.move();
+    }
+
+    size_t numRobotsWithAtLeast2Neighbours() const
+    {
+        size_t num = 0;
+        for (Robot const& robot : robots)
+        {
+            size_t neigh = 0;
+            for (Robot const& other : robots)
+            {
+                int dx = robot.position.x - other.position.x;
+                int dy = robot.position.y - other.position.y;
+
+                if (dx == 0 && (dy == 1 || dy == -1) || dy == 0 && (dx == 1 || dx == -1))
+                {
+                    neigh++;
+                }
+            }
+            if (neigh >= 2)
+                num++;
+        }
+        return num;
+    }
+
+    void print() const
+    {
+        for (int y = 0; y < HALL_HEIGHT; y++)
+        {
+            for (int x = 0; x < HALL_WIDTH; x++)
+            {
+                bool isRobotHere = false;
+                for (Robot const& r : robots)
+                {
+                    if (r.position.x == x && r.position.y == y)
+                    {
+                        isRobotHere = true;
+                        break;
+                    }
+                }
+                std::cout << (isRobotHere ? '#' : '.');
+            }
+            std::cout << "\n";
+        }
     }
 
 private:
@@ -134,31 +174,6 @@ private:
         const int y = pos.y < middleRow;
 
         return y * 2 + x;
-    }
-
-    static std::unordered_set<vec2l> getChristmasTreePositions()
-    {
-        static std::unordered_set<vec2l> positions;
-
-        if (!positions.empty())
-            return positions;
-        
-        // needles
-        for (int y = 0; y < HALL_HEIGHT - 1; y++)
-        {
-            const int treeWidth = 1 + 2*(y-1);
-            const int blankBeforeTree = (HALL_WIDTH - treeWidth) / 2;
-
-            for (int x = blankBeforeTree; x < blankBeforeTree + treeWidth; x++)
-            {
-                positions.insert({x, y});
-            }
-        }
-
-        // trunk
-        positions.insert({HALL_WIDTH / 2, HALL_HEIGHT - 1});
-
-        return positions;
     }
 };
 
@@ -182,11 +197,18 @@ public:
         hall.loadFromFile(inputPath.c_str());
 
         size_t seconds = 0;
-        while (!hall.isMakingChristmasTree())
+        size_t bestNeighbourhood = 0;
+        while (true)
         {
+            size_t num2neighbours = hall.numRobotsWithAtLeast2Neighbours();
+            if (num2neighbours > bestNeighbourhood)
+            {
+                bestNeighbourhood = num2neighbours;
+                hall.print();
+                std::cout << "This is after " << seconds << " seconds.\n\n";
+            }
             seconds++;
-            for (auto& robot : hall.robots)
-                robot.move();
+            hall.moveRobots();
         }
         return seconds;
     }
