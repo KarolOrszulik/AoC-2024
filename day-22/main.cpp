@@ -1,7 +1,8 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
-#include <queue>
+#include <array>
+#include <unordered_map>
 
 class Parser
 {
@@ -32,48 +33,26 @@ private:
     std::vector<size_t> numbers;
 };
 
-class PriceChangeHistory
+
+static constexpr int STRATEGY_SIZE = 4;
+struct PriceChangeHistory : public std::array<int, STRATEGY_SIZE>
 {
-public:
-    static constexpr int N = 4;
+    PriceChangeHistory(std::array<int, STRATEGY_SIZE> arr) : std::array<int, STRATEGY_SIZE>(arr) {}
 
-    bool operator==(PriceChangeHistory const& other) const
-    {
-        return deltas == other.deltas;
-    }
-
-    void add(int newDelta)
-    {
-        deltas.push(newDelta);
-        if (deltas.size() > N)
-            deltas.pop();
-    }
-
-    static std::vector<PriceChangeHistory> getAllPossible()
+    static std::vector<PriceChangeHistory> getAllPossible(int min = -9, int max = 9)
     {
         std::vector<PriceChangeHistory> result;
 
-        for (int i = MIN; i <= MAX; i++)
-        for (int ii = MIN; ii <= MAX; ii++)
-        for (int iii = MIN; iii <= MAX; iii++)
-        for (int iv = MIN; iv <= MAX; iv++)
+        for (int i = min; i <= max; i++)
+        for (int ii = min; ii <= max; ii++)
+        for (int iii = min; iii <= max; iii++)
+        for (int iv = min; iv <= max; iv++)
         {
-            PriceChangeHistory pch;
-            pch.add(i);
-            pch.add(ii);
-            pch.add(iii);
-            pch.add(iv);
-            result.push_back(pch);
+            result.push_back({{i,ii,iii,iv}});
         }
         
         return result;
     }
-
-private:
-    static constexpr int MIN = -9;
-    static constexpr int MAX = 9;
-
-    std::queue<int> deltas;
 };
 
 
@@ -93,7 +72,7 @@ public:
         size_t sum = 0;
         for (size_t n : parser.getNumbers())
         {
-            for (int i = 0; i < 2000; i++)
+            for (int i = 0; i < NUM_ITERATIONS; i++)
                 n = processNumber(n);
             sum += n;
         }
@@ -105,62 +84,76 @@ public:
         Parser parser;
         parser.parseFile(inputPath.c_str());
 
-        size_t maxBananas = 0;
-        int progress = 0;
-        for (PriceChangeHistory strategy : PriceChangeHistory::getAllPossible())
-        {
-            std::cout 
-                << "calculating " << progress++ << "/" << PriceChangeHistory::getAllPossible().size()
-                << "; current max: " << maxBananas << std::endl;
+        std::unordered_map<size_t, std::vector<PriceAndDelta>> numToHistory;
 
-            size_t numBananas = totalBananasForStrategy(strategy, parser.getNumbers());
+        for (size_t n : parser.getNumbers())
+        {
+            auto& history = numToHistory[n];
+            int lastPrice = toPrice(n);
+            for (int i = 0; i < NUM_ITERATIONS; i++)
+            {
+                n = processNumber(n);
+                const int price = toPrice(n);
+                const int delta = price - lastPrice;
+                history.push_back(PriceAndDelta{price, delta});
+                lastPrice = price;
+            }
+        }
+
+        auto all = PriceChangeHistory::getAllPossible();
+        int progress = 0;
+        size_t maxBananas = 0;
+        for (PriceChangeHistory strategy : all)
+        {
+            size_t numBananas = 0;
+
+            for (size_t n : parser.getNumbers())
+                numBananas += priceAtHistory(numToHistory[n], strategy);
+
             if (numBananas > maxBananas)
                 maxBananas = numBananas;
+
+            progress++;
+            if (progress % 100 == 0)
+                std::cout << "Progress: " << progress << "/" << all.size() << "\n";
         }
 
         return maxBananas;
     }
 
 private:
-    size_t totalBananasForStrategy(PriceChangeHistory const& strategy, std::vector<size_t> const& nums) const
+    static constexpr int NUM_ITERATIONS = 2000;
+
+    struct PriceAndDelta
     {
-        size_t numBananas = 0;
-        for (size_t n : nums)
-        {
-            size_t newBananas = numBananasForStrategy(strategy, n);
-            numBananas += newBananas;
-        }
-        return numBananas;
+        int price;
+        int delta;
+    };
+
+    size_t toPrice(size_t n)
+    {
+        return n % 10;
     }
 
-    size_t numBananasForStrategy(PriceChangeHistory const& strategy, size_t n) const
+    size_t priceAtHistory(std::vector<PriceAndDelta> const& history, PriceChangeHistory const& strategy)
     {
-        PriceChangeHistory history;
-        int lastPrice = 0;
-        for (int i = 0; i <= 2000; i++)
+        const size_t N = strategy.size();
+        for (int i = 3; i < history.size(); i++)
         {
-            const int price = n % 10;
-            if (i != 0)
-            {
-                const int delta = price - lastPrice;
-                history.add(delta);
-                if (history == strategy)
-                    return price;
-            }
-            lastPrice = price;
-            n = processNumber(n);
+            if (history[i].delta   == strategy[0] &&
+                history[i-1].delta == strategy[1] &&
+                history[i-2].delta == strategy[2] &&
+                history[i-3].delta == strategy[3])
+                return history[i].price;
         }
         return 0;
     }
 
     size_t processNumber(size_t n) const
     {
-        size_t result;
-
         n = mixAndPrune(n, n*64);
         n = mixAndPrune(n, n/32);
         n = mixAndPrune(n, n*2048);
-
         return n;
     }
 
