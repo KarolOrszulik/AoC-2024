@@ -1,12 +1,11 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
-#include <optional>
 #include <string>
 #include <vector>
 #include <unordered_map>
 
-using Circuit = std::unordered_map<std::string, std::optional<bool>>;
+using Circuit = std::unordered_map<std::string, bool>;
 
 enum class Type
 {
@@ -24,17 +23,17 @@ struct LogicGate
 
     bool update(Circuit& circuit) const
     {
+        if (circuit.count(inA) == 0 || circuit.count(inB) == 0)
+            return false;
+
         auto a = circuit[inA];
         auto b = circuit[inB];
 
-        if (a.has_value() && b.has_value())
+        if (circuit.count(out) == 0)
         {
-            auto outputBefore = circuit[out];
-            bool outputValue = getOutput(a.value(), b.value());
+            bool outputValue = getOutput(a, b);
             circuit[out] = outputValue;
-            
-            if (!outputBefore.has_value() || outputBefore.value() != outputValue)
-                return true;
+            return true;
         }
         return false;
     }
@@ -164,7 +163,7 @@ public:
         size_t result = 0;
         for (auto const [output, value] : parser.getCircuit())
         {
-            if (output.front() != 'z' || value.value() == false)
+            if (output.front() != 'z' || value == false)
                 continue;
 
             size_t outputNumber = std::stoi(std::string(output.begin() + 1, output.end()));
