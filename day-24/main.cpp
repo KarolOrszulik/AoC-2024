@@ -148,6 +148,18 @@ public:
 
     size_t part1()
     {
+        updateEntireCircuit();
+        return getNumberForLetter('z');
+    }
+
+    size_t part2()
+    {
+        return 0;
+    }
+
+private:
+    void updateEntireCircuit()
+    {
         bool doneUpdating = false;
         while (!doneUpdating)
         {
@@ -159,26 +171,22 @@ public:
                     doneUpdating = false;
             }
         }
+    }
 
+    size_t getNumberForLetter(char letter)
+    {
         size_t result = 0;
         for (auto const [output, value] : parser.getCircuit())
         {
-            if (output.front() != 'z' || value == false)
+            if (output.front() != letter || value == false)
                 continue;
 
             size_t outputNumber = std::stoi(std::string(output.begin() + 1, output.end()));
             result |= 1ULL << outputNumber;
         }
-
         return result;
     }
 
-    size_t part2()
-    {
-        return 0;
-    }
-
-private:
     Parser parser;
 };
 
